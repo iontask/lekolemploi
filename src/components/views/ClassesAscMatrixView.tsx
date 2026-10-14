@@ -133,26 +133,33 @@ export const ClassesAscMatrixView: React.FC<ClassesAscMatrixViewProps> = ({
               {/* Ligne 2 : Numéros de créneaux (C1..C7) */}
               <tr className="bg-slate-700 text-white border-b border-slate-600 text-[10px] font-mono">
                 {semaine.jours.map((_, jIdx) =>
-                  Array.from({ length: semaine.creneauxParJour[jIdx] }).map((_, cIdx) => (
-                    <th
-                      key={`${jIdx}-${cIdx}`}
-                      className="py-1 px-1 text-center w-10 border-r last:border-r-0 border-slate-600 font-semibold"
-                    >
-                      C{cIdx + 1}
-                    </th>
-                  ))
+                  Array.from({ length: semaine.creneauxParJour[jIdx] }).map((_, cIdx) => {
+                    const isEndOfMorning = cIdx === 3 && semaine.creneauxParJour[jIdx] === 7;
+                    return (
+                      <th
+                        key={`${jIdx}-${cIdx}`}
+                        title={isEndOfMorning ? 'Fin 4h matin · Pause 1h (12h30-13h30)' : undefined}
+                        className={`py-1 px-1 text-center w-10 border-r last:border-r-0 border-slate-600 font-semibold ${
+                          isEndOfMorning ? 'border-r-2 border-r-amber-400 bg-slate-800 text-amber-300' : ''
+                        }`}
+                      >
+                        C{cIdx + 1}
+                      </th>
+                    );
+                  })
                 )}
               </tr>
             </thead>
 
             <tbody className="divide-y divide-slate-200">
               {filteredClasses.map((cls, cIdx) => {
-                // Décomposition des créneaux en cellules (avec fusion colSpan des heures consécutives du même prof)
+                // Décomposition des créneaux en cellules (avec fusion colSpan des heures consécutives du même prof sans pause)
                 const cellsToRender: React.ReactNode[] = [];
                 let sIdx = 0;
 
                 while (sIdx < totalSlots) {
                   const coords = getSlotCoordinates(sIdx, semaine);
+                  const isEndOfMorning = coords.creneauNumero === 4 && semaine.creneauxParJour[coords.jourIndex] === 7;
                   const aff = slotToAffs.get(sIdx)?.find((a) => {
                     const u = uniteMap.get(a.uniteId);
                     return u && u.classeIds.includes(cls.id);
@@ -163,7 +170,9 @@ export const ClassesAscMatrixView: React.FC<ClassesAscMatrixViewProps> = ({
                     cellsToRender.push(
                       <td
                         key={`slot-${sIdx}`}
-                        className="p-1 border-r last:border-r-0 border-slate-100 text-center text-slate-300 font-mono text-[10px] bg-slate-50/20"
+                        className={`p-1 border-r last:border-r-0 border-slate-100 text-center text-slate-300 font-mono text-[10px] bg-slate-50/20 ${
+                          isEndOfMorning ? 'border-r-2 border-r-amber-300' : ''
+                        }`}
                       >
                         ·
                       </td>
@@ -177,11 +186,13 @@ export const ClassesAscMatrixView: React.FC<ClassesAscMatrixViewProps> = ({
                   const meta = getSubjectMeta(prof?.matiere || '');
                   const code = getSubjectAbbreviation(prof?.matiere || '');
 
-                  // Chercher si les créneaux consécutifs du MÊME JOUR ont le MÊME PROF
+                  // Chercher si les créneaux consécutifs du MÊME JOUR ont le MÊME PROF sans franchir la pause
                   let span = 1;
                   while (sIdx + span < totalSlots) {
                     const nextCoords = getSlotCoordinates(sIdx + span, semaine);
                     if (nextCoords.jourIndex !== coords.jourIndex) break; // Ne pas traverser de jour
+                    // Ne pas fusionner à travers la pause méridienne de 1h (entre C4 et C5)
+                    if (coords.creneauNumero <= 4 && nextCoords.creneauNumero >= 5) break;
 
                     const nextAff = slotToAffs.get(sIdx + span)?.find((a) => {
                       const u = uniteMap.get(a.uniteId);
@@ -195,11 +206,16 @@ export const ClassesAscMatrixView: React.FC<ClassesAscMatrixViewProps> = ({
                     }
                   }
 
+                  const spanEndCoords = getSlotCoordinates(sIdx + span - 1, semaine);
+                  const spanEndsAtPause = spanEndCoords.creneauNumero === 4 && semaine.creneauxParJour[spanEndCoords.jourIndex] === 7;
+
                   cellsToRender.push(
                     <td
                       key={`slot-${sIdx}`}
                       colSpan={span}
-                      className="p-1 border-r last:border-r-0 border-slate-200 text-center align-middle"
+                      className={`p-1 border-r last:border-r-0 border-slate-200 text-center align-middle ${
+                        spanEndsAtPause ? 'border-r-2 border-r-amber-400' : ''
+                      }`}
                     >
                       <div
                         className={`py-1 px-1.5 rounded border text-[11px] leading-tight flex flex-col items-center justify-center ${meta.badgeClass}`}

@@ -18,6 +18,8 @@ interface DraggableCourseCardProps {
   badgeClass: string;
   isCommon?: boolean;
   isBlock2h?: boolean;
+  isSelected?: boolean;
+  onSelect?: () => void;
 }
 
 export const DraggableCourseCard: React.FC<DraggableCourseCardProps> = ({
@@ -31,6 +33,8 @@ export const DraggableCourseCard: React.FC<DraggableCourseCardProps> = ({
   badgeClass,
   isCommon = false,
   isBlock2h = false,
+  isSelected = false,
+  onSelect,
 }) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id,
@@ -55,9 +59,24 @@ export const DraggableCourseCard: React.FC<DraggableCourseCardProps> = ({
     <div
       ref={setNodeRef}
       style={style}
+      onClick={(e) => {
+        e.stopPropagation();
+        onSelect?.();
+      }}
+      title={
+        isLocked
+          ? 'Cours verrouillé'
+          : 'Cliquer pour mettre en surbrillance les possibilités d\'échange et de déplacement (ou glisser-déposer)'
+      }
       className={`group relative p-1.5 rounded-lg border text-xs shadow-xs transition-all select-none ${badgeClass} ${
         isDragging ? 'opacity-40 ring-2 ring-slate-900 scale-95' : 'hover:shadow-md'
-      } ${isLocked ? 'ring-1 ring-amber-400/80 bg-amber-50/40' : 'cursor-grab active:cursor-grabbing'}`}
+      } ${
+        isSelected
+          ? 'ring-2 ring-blue-600 bg-blue-50/90 shadow-md scale-[1.02] border-blue-400 font-bold'
+          : isLocked
+          ? 'ring-1 ring-amber-400/80 bg-amber-50/40 cursor-default'
+          : 'cursor-pointer hover:border-slate-400'
+      }`}
     >
       <div className="flex items-center justify-between gap-1">
         <div className="flex items-center gap-1 min-w-0" {...(isLocked ? {} : listeners)} {...(isLocked ? {} : attributes)}>
@@ -68,6 +87,11 @@ export const DraggableCourseCard: React.FC<DraggableCourseCardProps> = ({
         </div>
 
         <div className="flex items-center gap-0.5 shrink-0">
+          {isSelected && (
+            <span className="text-[9px] font-bold px-1 py-0.2 rounded bg-blue-600 text-white uppercase animate-pulse">
+              🎯
+            </span>
+          )}
           {isBlock2h && (
             <span className="text-[9px] font-bold px-1 py-0.2 rounded bg-indigo-100 text-indigo-900 uppercase">
               2h

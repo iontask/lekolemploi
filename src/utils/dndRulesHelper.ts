@@ -4,7 +4,14 @@
  */
 
 import { Classe, Semaine, Teacher, Unite } from '../types';
-import { canPlace, getSlotCoordinates, isBlockSubject, score, verify } from '../rules';
+import {
+  areSlotsConsecutiveWithoutPause,
+  canPlace,
+  getSlotCoordinates,
+  isBlockSubject,
+  score,
+  verify,
+} from '../rules';
 import { Affectation, Planning, RulesOptions, ScheduleData, ScoreBreakdown } from '../rules/types';
 
 export type CellDropStatus = 'green' | 'orange' | 'red';
@@ -42,27 +49,20 @@ export function getBlockSlotsForAssignment(
   slot: number,
   semaine: Semaine
 ): number[] {
-  const currentCoords = getSlotCoordinates(slot, semaine);
   const sameUnitAffs = planning.filter((a) => a.uniteId === uniteId);
 
-  // Vérifier si le créneau suivant est sur le même jour et affecté à la même unité
+  // Vérifier si le créneau suivant est sur le même jour et affecté à la même unité sans pause
   const nextSlot = slot + 1;
   const hasNext = sameUnitAffs.some((a) => a.slot === nextSlot);
-  if (hasNext) {
-    const nextCoords = getSlotCoordinates(nextSlot, semaine);
-    if (nextCoords.jourIndex === currentCoords.jourIndex) {
-      return [slot, nextSlot];
-    }
+  if (hasNext && areSlotsConsecutiveWithoutPause(slot, nextSlot, semaine)) {
+    return [slot, nextSlot];
   }
 
-  // Vérifier si le créneau précédent est sur le même jour et affecté à la même unité
+  // Vérifier si le créneau précédent est sur le même jour et affecté à la même unité sans pause
   const prevSlot = slot - 1;
   const hasPrev = slot > 0 && sameUnitAffs.some((a) => a.slot === prevSlot);
-  if (hasPrev) {
-    const prevCoords = getSlotCoordinates(prevSlot, semaine);
-    if (prevCoords.jourIndex === currentCoords.jourIndex) {
-      return [prevSlot, slot];
-    }
+  if (hasPrev && areSlotsConsecutiveWithoutPause(prevSlot, slot, semaine)) {
+    return [prevSlot, slot];
   }
 
   return [slot];
@@ -78,7 +78,8 @@ export function evaluateMoveOrSwap(
   targetSlot: number,
   data: ScheduleData,
   lockedKeys: Set<string>,
-  options?: RulesOptions
+  options?: RulesOptions,
+  contextEntity?: { type: 'class' | 'teacher'; id: string }
 ): CellDropEvaluation {
   const { unites, teachers, classes, semaine } = data;
   const totalSlots = semaine.creneauxParJour.reduce((a, b) => a + b, 0);
@@ -121,14 +122,22 @@ export function evaluateMoveOrSwap(
     }
   }
 
-  // Pour un bloc de 2h : doit impérativement être le même jour
+  // Pour un bloc de 2h : doit impérativement être le même jour sans trou et sans chevaucher la pause méridienne de 1h
   if (isBlock) {
-    const c0 = getSlotCoordinates(targetSlots[0], semaine);
-    const c1 = getSlotCoordinates(targetSlots[1], semaine);
-    if (c0.jourIndex !== c1.jourIndex) {
+    if (!areSlotsConsecutiveWithoutPause(targetSlots[0], targetSlots[1], semaine)) {
+      const c0 = getSlotCoordinates(targetSlots[0], semaine);
+      const c1 = getSlotCoordinates(targetSlots[1], semaine);
+      const isPauseCross = c0.creneauNumero === 4 && c1.creneauNumero === 5;
+      const isDiffJour = c0.jourIndex !== c1.jourIndex;
       return {
         status: 'red',
-        reasons: ['Un bloc de 2 h ne peut pas être coupé sur deux journées différentes.'],
+        reasons: [
+          isDiffJour
+            ? 'Un bloc de 2 h ne peut pas être coupé sur deux journées différentes.'
+            : isPauseCross
+              ? 'Un bloc de 2 h ne peut pas être scindé par la pause méridienne de 1h (entre C4 et C5).'
+              : 'Un bloc de 2 h doit être consécutif sans trou le même jour.',
+        ],
         isSwap: false,
       };
     }
@@ -161,10 +170,24 @@ export function evaluateMoveOrSwap(
     }
   }
 
-  // Trouver les affectations actuellement présentes sur les créneaux cibles
-  const occupiedAffs = planning.filter(
-    (a) => targetSlots.includes(a.slot) && a.uniteId !== sourceUniteId
-  );
+  // Identifier le contexte d'entité actif (classe ou enseignant)
+  const effectiveContext =
+    contextEntity ||
+    (unite.classeIds.length > 0 ? { type: 'class' as const, id: unite.classeIds[0] } : undefined);
+
+  // Trouver les affectations actuellement présentes sur les créneaux cibles dans ce contexte précis
+  const occupiedAffs = planning.filter((a) => {
+    if (!targetSlots.includes(a.slot) || a.uniteId === sourceUniteId) return false;
+    if (effectiveContext?.type === 'class') {
+      const u = unites.find((un) => un.id === a.uniteId);
+      return u ? u.classeIds.includes(effectiveContext.id) : false;
+    }
+    if (effectiveContext?.type === 'teacher') {
+      const u = unites.find((un) => un.id === a.uniteId);
+      return u ? u.teacherId === effectiveContext.id : false;
+    }
+    return true;
+  });
 
   // -------------------------------------------------------------
   // CAS 1 : ÉCHANGE (SWAP) avec un cours présent sur la case cible
@@ -365,7 +388,8 @@ export function executeMoveOrSwap(
   targetSlot: number,
   data: ScheduleData,
   lockedKeys: Set<string>,
-  options?: RulesOptions
+  options?: RulesOptions,
+  contextEntity?: { type: 'class' | 'teacher'; id: string }
 ): {
   newPlanning: Planning;
   success: boolean;
@@ -380,7 +404,8 @@ export function executeMoveOrSwap(
     targetSlot,
     data,
     lockedKeys,
-    options
+    options,
+    contextEntity
   );
 
   if (evalResult.status === 'red') {
@@ -437,5 +462,333 @@ export function executeMoveOrSwap(
     success: true,
     isSwap: false,
     warning: evalResult.warningMessage,
+  };
+}
+
+export interface UnassignedSessionItem {
+  id: string; // ex: `bin_${unite.id}_2h_${idx}`
+  uniteId: string;
+  classeIds: string[];
+  teacherId: string;
+  matiere: string;
+  profNom: string;
+  duration: 1 | 2;
+  isBlock2h: boolean;
+  classesLabel: string;
+}
+
+/**
+ * Calcule la liste des séances / blocs non affectés pour une entité (classe ou enseignant)
+ */
+export function getUnassignedSessionsForEntity(
+  data: ScheduleData,
+  planning: Planning,
+  contextEntity: { type: 'class' | 'teacher'; id: string }
+): UnassignedSessionItem[] {
+  const { unites, teachers, classes } = data;
+  const teacherMap = new Map<string, Teacher>(teachers.map((t) => [t.id, t]));
+  const classMap = new Map<string, Classe>(classes.map((c) => [c.id, c]));
+
+  // Filtrer les unités concernées par l'entité
+  const relevantUnites = unites.filter((u) => {
+    if (contextEntity.type === 'class') {
+      return u.classeIds.includes(contextEntity.id);
+    } else {
+      return u.teacherId === contextEntity.id;
+    }
+  });
+
+  const items: UnassignedSessionItem[] = [];
+
+  for (const u of relevantUnites) {
+    const placedCount = planning.filter((a) => a.uniteId === u.id).length;
+    const remainingHours = Math.max(0, u.heures - placedCount);
+    if (remainingHours <= 0) continue;
+
+    const prof = teacherMap.get(u.teacherId);
+    const classesLabel = u.classeIds.map((cid) => classMap.get(cid)?.nom || cid).join(' + ');
+
+    // Découpage en blocs de 2h et séances de 1h selon la règle
+    const num2hBlocks = Math.floor(remainingHours / 2);
+    const num1hSingles = remainingHours % 2;
+
+    for (let b = 0; b < num2hBlocks; b++) {
+      items.push({
+        id: `bin_${u.id}_2h_${b}`,
+        uniteId: u.id,
+        classeIds: u.classeIds,
+        teacherId: u.teacherId,
+        matiere: prof?.matiere || 'Matière',
+        profNom: prof?.nom || u.teacherId,
+        duration: 2,
+        isBlock2h: true,
+        classesLabel,
+      });
+    }
+
+    for (let s = 0; s < num1hSingles; s++) {
+      items.push({
+        id: `bin_${u.id}_1h_${s}`,
+        uniteId: u.id,
+        classeIds: u.classeIds,
+        teacherId: u.teacherId,
+        matiere: prof?.matiere || 'Matière',
+        profNom: prof?.nom || u.teacherId,
+        duration: 1,
+        isBlock2h: false,
+        classesLabel,
+      });
+    }
+  }
+
+  return items;
+}
+
+/**
+ * Évalue la validité du placement d'une séance depuis le bac vers un créneau cible
+ */
+export function evaluatePlaceFromBin(
+  planning: Planning,
+  uniteId: string,
+  isBlock2h: boolean,
+  targetSlot: number,
+  data: ScheduleData,
+  lockedKeys: Set<string>,
+  options?: RulesOptions,
+  contextEntity?: { type: 'class' | 'teacher'; id: string }
+): CellDropEvaluation {
+  const { unites, teachers, semaine } = data;
+  const totalSlots = semaine.creneauxParJour.reduce((a, b) => a + b, 0);
+
+  const unite = unites.find((u) => u.id === uniteId);
+  if (!unite) {
+    return {
+      status: 'red',
+      reasons: ['Unité introuvable dans la base de données.'],
+      isSwap: false,
+    };
+  }
+
+  const prof = teachers.find((t) => t.id === unite.teacherId);
+  const targetSlots: number[] = isBlock2h ? [targetSlot, targetSlot + 1] : [targetSlot];
+
+  // Vérification des limites temporelles
+  for (const s of targetSlots) {
+    if (s < 0 || s >= totalSlots) {
+      return {
+        status: 'red',
+        reasons: [`Le créneau ${s} est hors limites de la semaine.`],
+        isSwap: false,
+      };
+    }
+  }
+
+  // Pour un bloc de 2h : vérification de consécutivité sans pause
+  if (isBlock2h) {
+    if (!areSlotsConsecutiveWithoutPause(targetSlots[0], targetSlots[1], semaine, options?.respecterPauseMidiBlocs !== false)) {
+      const c0 = getSlotCoordinates(targetSlots[0], semaine);
+      const c1 = getSlotCoordinates(targetSlots[1], semaine);
+      const isPauseCross = c0.creneauNumero === 4 && c1.creneauNumero === 5;
+      const isDiffJour = c0.jourIndex !== c1.jourIndex;
+      return {
+        status: 'red',
+        reasons: [
+          isDiffJour
+            ? 'Un bloc de 2 h ne peut pas être coupé sur deux journées différentes.'
+            : isPauseCross
+              ? 'Un bloc de 2 h ne peut pas être scindé par la pause méridienne de 1h (entre C4 et C5).'
+              : 'Un bloc de 2 h doit être consécutif sans trou le même jour.',
+        ],
+        isSwap: false,
+      };
+    }
+  }
+
+  // Vérifier la disponibilité de l'enseignant
+  if (prof) {
+    for (const s of targetSlots) {
+      if (!prof.dispo[s]) {
+        const c = getSlotCoordinates(s, semaine);
+        return {
+          status: 'red',
+          reasons: [`L'enseignant ${prof.nom} est indisponible (${c.jourNom} C${c.creneauNumero}).`],
+          isSwap: false,
+        };
+      }
+    }
+  }
+
+  // Vérifier les conflits prof sur d'autres classes
+  for (const s of targetSlots) {
+    const teacherConflict = planning.find((a) => {
+      if (a.slot !== s) return false;
+      const otherU = unites.find((u) => u.id === a.uniteId);
+      return otherU && otherU.teacherId === unite.teacherId && otherU.id !== unite.id;
+    });
+    if (teacherConflict) {
+      const c = getSlotCoordinates(s, semaine);
+      return {
+        status: 'red',
+        reasons: [`L'enseignant ${prof?.nom || unite.teacherId} a déjà un cours avec une autre classe sur ce créneau (${c.jourNom} C${c.creneauNumero}).`],
+        isSwap: false,
+      };
+    }
+  }
+
+  // Vérifier s'il y a un cours existant pour la classe cible sur targetSlots
+  let displacedUniteId: string | undefined;
+  let displacedSlots: number[] | undefined;
+  let isSwap = false;
+
+  for (const s of targetSlots) {
+    const existing = planning.find((a) => {
+      if (a.slot !== s) return false;
+      const otherU = unites.find((u) => u.id === a.uniteId);
+      if (!otherU) return false;
+      if (contextEntity?.type === 'class') {
+        return otherU.classeIds.includes(contextEntity.id);
+      } else if (contextEntity?.type === 'teacher') {
+        return otherU.teacherId === contextEntity.id;
+      }
+      return otherU.classeIds.some((cid) => unite.classeIds.includes(cid));
+    });
+
+    if (existing) {
+      isSwap = true;
+      displacedUniteId = existing.uniteId;
+      displacedSlots = getBlockSlotsForAssignment(planning, existing.uniteId, existing.slot, semaine);
+      // Vérifier si le cours existant est verrouillé
+      if (displacedSlots.some((ds) => isSlotLocked(lockedKeys, existing.uniteId, ds))) {
+        return {
+          status: 'red',
+          reasons: ['Le cours présent sur cette case est verrouillé (cadenas) et ne peut pas être remplacé.'],
+          isSwap: true,
+        };
+      }
+    }
+  }
+
+  // Simuler le planning avec ce placement (et déplacement vers le bac si occupé)
+  const simulatedPlanning = planning
+    .filter((a) => {
+      if (displacedUniteId && displacedSlots && a.uniteId === displacedUniteId && displacedSlots.includes(a.slot)) {
+        return false;
+      }
+      return true;
+    })
+    .concat(targetSlots.map((s) => ({ uniteId, slot: s })));
+
+  // Vérifier les violations dures globales (hors HEURES_NON_PLACEES car nous sommes en cours de complétion)
+  const violations = verify(simulatedPlanning, data, options);
+  const hardViolations = violations.filter(
+    (v) => v.severite === 'DURE' && v.type !== 'HEURES_NON_PLACEES'
+  );
+
+  if (hardViolations.length > 0) {
+    return {
+      status: 'red',
+      reasons: hardViolations.map((v) => v.message),
+      isSwap,
+      swapTargetUniteId: displacedUniteId,
+      swapTargetSlots: displacedSlots,
+    };
+  }
+
+  return {
+    status: isSwap ? 'orange' : 'green',
+    reasons: isSwap
+      ? ['Placement avec remplacement (le cours existant sera renvoyé dans le bac).']
+      : ['Placement optimal sur créneau libre (0 conflit dur).'],
+    isSwap,
+    swapTargetUniteId: displacedUniteId,
+    swapTargetSlots: displacedSlots,
+  };
+}
+
+/**
+ * Exécute le placement d'une séance depuis le bac vers le créneau cible
+ */
+export function executePlaceFromBin(
+  planning: Planning,
+  uniteId: string,
+  isBlock2h: boolean,
+  targetSlot: number,
+  data: ScheduleData,
+  lockedKeys: Set<string>,
+  options?: RulesOptions,
+  contextEntity?: { type: 'class' | 'teacher'; id: string }
+): {
+  newPlanning: Planning;
+  success: boolean;
+  isSwap: boolean;
+  displacedUniteId?: string;
+  error?: string;
+  warning?: string;
+} {
+  const evalResult = evaluatePlaceFromBin(
+    planning,
+    uniteId,
+    isBlock2h,
+    targetSlot,
+    data,
+    lockedKeys,
+    options,
+    contextEntity
+  );
+
+  if (evalResult.status === 'red') {
+    return {
+      newPlanning: planning,
+      success: false,
+      isSwap: evalResult.isSwap,
+      error: evalResult.reasons.join(' '),
+    };
+  }
+
+  const targetSlots = isBlock2h ? [targetSlot, targetSlot + 1] : [targetSlot];
+
+  let newPlanning = planning.filter((a) => {
+    if (
+      evalResult.swapTargetUniteId &&
+      evalResult.swapTargetSlots &&
+      a.uniteId === evalResult.swapTargetUniteId &&
+      evalResult.swapTargetSlots.includes(a.slot)
+    ) {
+      return false; // Renvoi de l'ancien cours dans le bac
+    }
+    return true;
+  });
+
+  newPlanning = newPlanning.concat(targetSlots.map((s) => ({ uniteId, slot: s })));
+
+  return {
+    newPlanning,
+    success: true,
+    isSwap: evalResult.isSwap,
+    displacedUniteId: evalResult.swapTargetUniteId,
+    warning: evalResult.isSwap ? 'Le cours remplacé a été renvoyé dans le bac de réserve.' : undefined,
+  };
+}
+
+/**
+ * Désassigne un cours de la grille pour le renvoyer dans le bac
+ */
+export function executeUnassignToBin(
+  planning: Planning,
+  uniteId: string,
+  slots: number[]
+): {
+  newPlanning: Planning;
+  success: boolean;
+  removedSlots: number[];
+} {
+  const newPlanning = planning.filter(
+    (a) => !(a.uniteId === uniteId && slots.includes(a.slot))
+  );
+
+  return {
+    newPlanning,
+    success: true,
+    removedSlots: slots,
   };
 }

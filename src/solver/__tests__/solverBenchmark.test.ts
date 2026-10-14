@@ -15,6 +15,12 @@ import { ImportDataset } from '../../types';
 describe('Jeu de référence officiel (360 heures, 28 enseignants, 12 classes)', () => {
   const dataset = referenceData.dataset as unknown as ImportDataset;
   const referencePlanning = referenceData.planning as Affectation[];
+  const benchmarkConfig = {
+    ...DEFAULT_SOLVER_CONFIG,
+    toutesMatieresABlocs: false,
+    respecterPauseMidiBlocs: false,
+    matieresABlocs: ['Arabe', 'Anglais'],
+  };
 
   describe('1. Validation structurelle du jeu de données de référence', () => {
     it('contient exactement 28 enseignants, 12 classes et 360 heures totales', () => {
@@ -49,7 +55,7 @@ describe('Jeu de référence officiel (360 heures, 28 enseignants, 12 classes)',
     });
 
     it('présente 0 conflit dur (0 violation dure)', () => {
-      const violations = verify(referencePlanning, dataset, DEFAULT_SOLVER_CONFIG);
+      const violations = verify(referencePlanning, dataset, benchmarkConfig);
       const hardViolations = violations.filter((v) => v.severite === 'DURE');
 
       if (hardViolations.length > 0) {
@@ -59,7 +65,7 @@ describe('Jeu de référence officiel (360 heures, 28 enseignants, 12 classes)',
     });
 
     it('respecte strictement les blocs de 2 heures pour l\'Arabe et l\'Anglais', () => {
-      const violations = verify(referencePlanning, dataset, DEFAULT_SOLVER_CONFIG);
+      const violations = verify(referencePlanning, dataset, benchmarkConfig);
       const blockViolations = violations.filter(
         (v) =>
           v.type === 'BLOC_EXCES_JOUR' ||
@@ -70,25 +76,25 @@ describe('Jeu de référence officiel (360 heures, 28 enseignants, 12 classes)',
     });
 
     it('respecte la disponibilité de tous les enseignants (aucun prof sur créneau indisponible)', () => {
-      const violations = verify(referencePlanning, dataset, DEFAULT_SOLVER_CONFIG);
+      const violations = verify(referencePlanning, dataset, benchmarkConfig);
       const indispoViolations = violations.filter((v) => v.type === 'PROF_INDISPONIBLE');
       expect(indispoViolations).toHaveLength(0);
     });
 
     it('aucun conflit enseignant (un seul cours par créneau et par prof)', () => {
-      const violations = verify(referencePlanning, dataset, DEFAULT_SOLVER_CONFIG);
+      const violations = verify(referencePlanning, dataset, benchmarkConfig);
       const profConflits = violations.filter((v) => v.type === 'PROF_CONFLIT');
       expect(profConflits).toHaveLength(0);
     });
 
     it('aucun conflit classe (un seul cours par créneau et par classe)', () => {
-      const violations = verify(referencePlanning, dataset, DEFAULT_SOLVER_CONFIG);
+      const violations = verify(referencePlanning, dataset, benchmarkConfig);
       const classeConflits = violations.filter((v) => v.type === 'CLASSE_CONFLIT');
       expect(classeConflits).toHaveLength(0);
     });
 
     it('calcule un score d\'optimisation valide et sans pénalité dure', () => {
-      const scoreResult = score(referencePlanning, dataset, DEFAULT_SOLVER_CONFIG);
+      const scoreResult = score(referencePlanning, dataset, benchmarkConfig);
       expect(scoreResult.total).toBeGreaterThan(0);
       expect(scoreResult.nombreViolationsDures).toBe(0);
     });
@@ -126,12 +132,12 @@ describe('Jeu de référence officiel (360 heures, 28 enseignants, 12 classes)',
         semaine: dataset.semaine,
       };
 
-      const planning = solvePhaseA(subsetData, DEFAULT_SOLVER_CONFIG);
+      const planning = solvePhaseA(subsetData, benchmarkConfig);
       const expectedHours = subsetUnites.reduce((sum, u) => sum + u.heures, 0);
 
       expect(planning.length).toBe(expectedHours);
 
-      const violations = verify(planning, subsetData, DEFAULT_SOLVER_CONFIG);
+      const violations = verify(planning, subsetData, benchmarkConfig);
       const hardViolations = violations.filter((v) => v.severite === 'DURE');
       expect(hardViolations).toHaveLength(0);
 

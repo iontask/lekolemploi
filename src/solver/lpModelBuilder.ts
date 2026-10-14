@@ -4,7 +4,7 @@
  */
 
 import { Classe, Teacher, Unite } from '../types';
-import { getSlotCoordinates, isBlockSubject } from '../rules';
+import { areSlotsConsecutiveWithoutPause, getSlotCoordinates, isBlockSubject } from '../rules';
 import { Planning, ScheduleData } from '../rules/types';
 import { SolverConfig } from './types';
 
@@ -160,21 +160,20 @@ export function buildLpModel(
   for (let uIdx = 0; uIdx < unites.length; uIdx++) {
     const unite = unites[uIdx];
     const prof = teacherMap.get(unite.teacherId);
-    if (!prof || !isBlockSubject(prof.matiere, config.matieresABlocs)) {
+    if (!prof || !isBlockSubject(prof.matiere, config.matieresABlocs, config.toutesMatieresABlocs !== false)) {
       continue;
     }
 
     const validSlots = validSlotsPerUnit.get(uIdx) || [];
     const zVarsForUnit: string[] = [];
 
-    // Identifier les créneaux où un bloc de 2h peut débuter (s et s+1 même jour et dispo)
+    // Identifier les créneaux où un bloc de 2h peut débuter (s et s+1 même jour sans franchir la pause)
     for (const s of validSlots) {
-      const cCurrent = getSlotCoordinates(s, semaine);
       const nextSlot = s + 1;
       const hasNextSlot = validSlots.includes(nextSlot);
-      const cNext = hasNextSlot ? getSlotCoordinates(nextSlot, semaine) : null;
+      const canFormNextBlock = hasNextSlot && areSlotsConsecutiveWithoutPause(s, nextSlot, semaine);
 
-      if (cNext && cNext.jourIndex === cCurrent.jourIndex) {
+      if (canFormNextBlock) {
         const bName = bVarName(uIdx, s);
         allBinaries.push(bName);
       }
@@ -186,13 +185,12 @@ export function buildLpModel(
 
       // Liaison : x[u, s] - b[u, s] - b[u, s-1] - z[u, s] = 0
       const prevSlot = s - 1;
-      const cPrev = s > 0 ? getSlotCoordinates(prevSlot, semaine) : null;
       const prevHasBlock =
-        cPrev && cPrev.jourIndex === cCurrent.jourIndex && validSlots.includes(prevSlot);
+        s > 0 && validSlots.includes(prevSlot) && areSlotsConsecutiveWithoutPause(prevSlot, s, semaine);
 
       const linkTerms: string[] = [xVarName(uIdx, s)];
       // b[u, s] si existe
-      if (cNext && cNext.jourIndex === cCurrent.jourIndex) {
+      if (canFormNextBlock) {
         linkTerms.push(`- ${bVarName(uIdx, s)}`);
       }
       // b[u, s-1] si existe

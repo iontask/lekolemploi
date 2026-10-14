@@ -238,15 +238,45 @@ export const ConstraintsPanel: React.FC<ConstraintsPanelProps> = ({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* SECTION 1 : MATIÈRES À BLOCS */}
+        {/* SECTION 1 : RÈGLE DES BLOCS DE 2H */}
         <div className="p-5 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-4">
-          <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-            <Layers className="w-4 h-4 text-indigo-600" />
-            <h2 className="text-sm font-bold text-slate-900">1. Matières à blocs de 2h consécutives</h2>
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div className="flex items-center gap-2">
+              <Layers className="w-4 h-4 text-indigo-600" />
+              <h2 className="text-sm font-bold text-slate-900">1. Règle des blocs de 2h consécutives</h2>
+            </div>
+            <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-200 hover:bg-indigo-100 transition-colors">
+              <input
+                type="checkbox"
+                checked={options.toutesMatieresABlocs ?? true}
+                onChange={(e) =>
+                  setOptions({
+                    ...options,
+                    toutesMatieresABlocs: e.target.checked,
+                  })
+                }
+                className="rounded text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5"
+              />
+              <span>Toutes les matières (Recommandé)</span>
+            </label>
           </div>
-          <p className="text-xs text-slate-600">
-            Ces matières doivent obligatoirement être planifiées en blocs de 2 heures d'affilée le même jour (sauf 1h isolée pour les volumes horaires impairs).
-          </p>
+
+          <div className="text-xs text-slate-600 space-y-1.5 bg-slate-50 p-3 rounded-lg border border-slate-200/70">
+            <div className="font-semibold text-slate-800">Spécifications officielles appliquées :</div>
+            <ul className="list-disc list-inside space-y-1 text-[11px] text-slate-600">
+              <li><strong>Volumes pairs</strong> (ex: 4h) : divisés en blocs de 2h consécutives sur des jours différents.</li>
+              <li><strong>Volumes impairs</strong> (ex: 7h) : blocs de 2h consécutives (3 jours x 2h) et le reste (1h) un autre jour.</li>
+              <li><strong>Aucun trou</strong> ne peut scinder un bloc de 2h.</li>
+              <li><strong>Pause méridienne de 1h</strong> après 4h : la journée est coupée en 4h matin puis 1h pause puis 3h après-midi. Les blocs de 2h ne peuvent pas franchir la pause (C4 + C5 interdit).</li>
+              <li><strong>Maximum 2h par jour</strong> pour une même matière dans une classe.</li>
+            </ul>
+          </div>
+
+          {!(options.toutesMatieresABlocs ?? true) && (
+            <>
+              <p className="text-xs text-slate-600">
+                Liste restreinte des matières soumises à la règle stricte des blocs de 2h :
+              </p>
 
           <div className="flex flex-wrap gap-2 pt-1">
             {(options.matieresABlocs || ['Arabe', 'Anglais']).map((subj) => (
@@ -301,6 +331,8 @@ export const ConstraintsPanel: React.FC<ConstraintsPanelProps> = ({
                 </button>
               ))}
           </div>
+            </>
+          )}
         </div>
 
         {/* SECTION 2 : PLAFONDS & MAX D'HEURES PAR JOUR */}

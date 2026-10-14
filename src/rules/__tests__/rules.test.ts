@@ -5,7 +5,14 @@
 
 import { describe, expect, it } from 'vitest';
 import { Classe, Semaine, Teacher, Unite } from '../../types';
-import { canPlace, getSlotCoordinates, isBlockSubject, score, verify } from '../index';
+import {
+  areSlotsConsecutiveWithoutPause,
+  canPlace,
+  getSlotCoordinates,
+  isBlockSubject,
+  score,
+  verify,
+} from '../index';
 import { Planning, ScheduleData } from '../types';
 
 describe('Module rules - Emplois du temps', () => {
@@ -489,6 +496,135 @@ describe('Module rules - Emplois du temps', () => {
       const resNonAdjacent = canPlace(planning, uniteArabe4h, 3, testData);
       expect(resNonAdjacent.ok).toBe(false);
       expect(resNonAdjacent.raisons.some((r) => r.includes('doivent être consécutives'))).toBe(true);
+    });
+  });
+
+  describe('Spécification complète : Blocs de 2h pour toutes les matières et Pause méridienne de 1h', () => {
+    it('areSlotsConsecutiveWithoutPause vérifie la consécutivité et la pause de 1h', () => {
+      // Dans une journée de 7h (slots 0..6 pour Lundi) :
+      // Matin (4h) : C1(0), C2(1), C3(2), C4(3)
+      // Pause de 1h : entre C4 et C5
+      // Après-midi (3h) : C5(4), C6(5), C7(6)
+      expect(areSlotsConsecutiveWithoutPause(0, 1, semaineStandard)).toBe(true); // C1 - C2
+      expect(areSlotsConsecutiveWithoutPause(1, 2, semaineStandard)).toBe(true); // C2 - C3
+      expect(areSlotsConsecutiveWithoutPause(2, 3, semaineStandard)).toBe(true); // C3 - C4
+      expect(areSlotsConsecutiveWithoutPause(3, 4, semaineStandard)).toBe(false); // C4 - C5 (INTERDIT : PAUSE DE 1H)
+      expect(areSlotsConsecutiveWithoutPause(4, 5, semaineStandard)).toBe(true); // C5 - C6
+      expect(areSlotsConsecutiveWithoutPause(5, 6, semaineStandard)).toBe(true); // C6 - C7
+      expect(areSlotsConsecutiveWithoutPause(0, 2, semaineStandard)).toBe(false); // Trou
+      expect(areSlotsConsecutiveWithoutPause(6, 7, semaineStandard)).toBe(false); // Changement de jour (Lundi C7 vers Mardi C1)
+
+      // Le vendredi (4h) :
+      // Slots 28..31
+      expect(areSlotsConsecutiveWithoutPause(28, 29, semaineStandard)).toBe(true); // C1 - C2
+      expect(areSlotsConsecutiveWithoutPause(30, 31, semaineStandard)).toBe(true); // C3 - C4
+    });
+
+    it('applique la règle des blocs de 2h aux Mathématiques (charge paire 4h : 2 blocs de 2h sur 2 jours)', () => {
+      // 4h Math = Lundi C1-C2 (slots 0, 1) + Mardi C1-C2 (slots 7, 8) -> VALIDE
+      const planningValide: Planning = [
+        { uniteId: uniteMath4h.id, slot: 0 },
+        { uniteId: uniteMath4h.id, slot: 1 },
+        { uniteId: uniteMath4h.id, slot: 7 },
+        { uniteId: uniteMath4h.id, slot: 8 },
+      ];
+
+      const dataMath: ScheduleData = {
+        ...testData,
+        unites: [uniteMath4h],
+      };
+
+      const violationsValides = verify(planningValide, dataMath);
+      const blockV = violationsValides.filter((v) => v.type.startsWith('BLOC_'));
+      expect(blockV).toHaveLength(0);
+
+      // Si divisé avec des séances de 1h isolées (2h + 1h + 1h) -> INVALIDE
+      const planningInvalide: Planning = [
+        { uniteId: uniteMath4h.id, slot: 0 },
+        { uniteId: uniteMath4h.id, slot: 1 },
+        { uniteId: uniteMath4h.id, slot: 7 }, // 1h isolée Mardi
+        { uniteId: uniteMath4h.id, slot: 14 }, // 1h isolée Mercredi
+      ];
+
+      const violationsInvalides = verify(planningInvalide, dataMath);
+      expect(violationsInvalides.some((v) => v.type === 'BLOC_HEURE_ISOLEE_INVALIDE')).toBe(true);
+    });
+
+    it('applique la règle aux charges impaires (ex: 7h = 3 blocs de 2h sur 3 jours et 1h un autre jour)', () => {
+      const profSvt: Teacher = {
+        id: 'p_svt',
+        nom: 'BENNANI Hicham',
+        matiere: 'SVT',
+        dispo: new Array(32).fill(true),
+      };
+
+      const uniteSvt7h: Unite = {
+        id: 'u_svt_7h',
+        teacherId: profSvt.id,
+        classeIds: [classe1.id],
+        heures: 7,
+      };
+
+      const dataSvt: ScheduleData = {
+        ...testData,
+        teachers: [...testData.teachers, profSvt],
+        unites: [uniteSvt7h],
+      };
+
+      // 7h réparties exactement comme demandé : 2h Lundi + 2h Mardi + 2h Mercredi + 1h Jeudi
+      const planning7hValide: Planning = [
+        { uniteId: uniteSvt7h.id, slot: 0 }, // Lun C1
+        { uniteId: uniteSvt7h.id, slot: 1 }, // Lun C2
+        { uniteId: uniteSvt7h.id, slot: 7 }, // Mar C1
+        { uniteId: uniteSvt7h.id, slot: 8 }, // Mar C2
+        { uniteId: uniteSvt7h.id, slot: 14 }, // Mer C1
+        { uniteId: uniteSvt7h.id, slot: 15 }, // Mer C2
+        { uniteId: uniteSvt7h.id, slot: 21 }, // Jeu C1 (1h isolée)
+      ];
+
+      const violationsValides = verify(planning7hValide, dataSvt);
+      const bViolations = violationsValides.filter((v) => v.type.startsWith('BLOC_'));
+      expect(bViolations).toHaveLength(0);
+
+      // Si 7h est mal découpée (ex: 2h + 2h + 1h + 1h + 1h -> 3 séances isolées au lieu d'une seule) -> INVALIDE
+      const planning7hInvalide: Planning = [
+        { uniteId: uniteSvt7h.id, slot: 0 }, // Lun C1
+        { uniteId: uniteSvt7h.id, slot: 1 }, // Lun C2
+        { uniteId: uniteSvt7h.id, slot: 7 }, // Mar C1
+        { uniteId: uniteSvt7h.id, slot: 8 }, // Mar C2
+        { uniteId: uniteSvt7h.id, slot: 14 }, // Mer C1 (1h)
+        { uniteId: uniteSvt7h.id, slot: 21 }, // Jeu C1 (1h)
+        { uniteId: uniteSvt7h.id, slot: 28 }, // Ven C1 (1h)
+      ];
+
+      const violationsInvalides = verify(planning7hInvalide, dataSvt);
+      expect(violationsInvalides.some((v) => v.type === 'BLOC_HEURE_ISOLEE_INVALIDE')).toBe(true);
+    });
+
+    it('refuse catégoriquement un bloc de 2h à cheval sur la pause méridienne de 1h (C4 et C5)', () => {
+      // Slot 3 = Lundi C4 (11h30 - 12h30)
+      // Slot 4 = Lundi C5 (13h30 - 14h30)
+      // Entre les deux : 1h de pause méridienne !
+      const planningPauseCross: Planning = [
+        { uniteId: uniteMath4h.id, slot: 3 },
+        { uniteId: uniteMath4h.id, slot: 4 },
+      ];
+
+      const dataMath: ScheduleData = {
+        ...testData,
+        unites: [uniteMath4h],
+      };
+
+      const violations = verify(planningPauseCross, dataMath);
+      const pauseViolation = violations.find((v) => v.type === 'BLOC_NON_CONSECUTIF');
+      expect(pauseViolation).toBeDefined();
+      expect(pauseViolation?.message).toContain('pause méridienne de 1h');
+
+      // canPlace refuse également d'ajouter le slot 4 (C5) si le slot 3 (C4) est déjà présent
+      const planningWithC4: Planning = [{ uniteId: uniteMath4h.id, slot: 3 }];
+      const cpRes = canPlace(planningWithC4, uniteMath4h, 4, dataMath);
+      expect(cpRes.ok).toBe(false);
+      expect(cpRes.raisons.some((r) => r.includes('pause méridienne de 1h'))).toBe(true);
     });
   });
 });

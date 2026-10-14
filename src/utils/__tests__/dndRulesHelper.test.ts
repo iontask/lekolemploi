@@ -175,4 +175,114 @@ describe('Étape 5 - Assistant Glisser-Déposer & Règles de Déplacement', () =
     expect(exec.newPlanning).toContainEqual({ uniteId: 'U1', slot: 8 });
     expect(exec.newPlanning).toContainEqual({ uniteId: 'U2', slot: 0 });
   });
+
+  it('évalue correctement l\'échange dans le contexte précis d\'une classe', () => {
+    // Dans ce planning :
+    // C1 a U1 en slot 0 et U2 en slot 8
+    // C2 a U3 en slot 0
+    const planning = [
+      { uniteId: 'U1', slot: 0 },
+      { uniteId: 'U3', slot: 0 },
+      { uniteId: 'U3', slot: 1 },
+      { uniteId: 'U2', slot: 8 },
+    ];
+    const locked = new Set<string>();
+
+    // Évaluation pour la classe C1 depuis U1(slot 0) vers slot 8
+    const evalClassC1 = evaluateMoveOrSwap(
+      planning,
+      'U1',
+      [0],
+      8,
+      sampleData,
+      locked,
+      undefined,
+      { type: 'class', id: 'C1' }
+    );
+
+    // Dans C1, le slot 8 est occupé par U2 (donc échange avec U2)
+    expect(evalClassC1.isSwap).toBe(true);
+    expect(evalClassC1.swapTargetUniteId).toBe('U2');
+    expect(evalClassC1.status).not.toBe('red');
+  });
+
+  it('refuse formellement un bloc de 2h scindé par la pause méridienne de 1h (entre C4 et C5)', () => {
+    const planning = [
+      { uniteId: 'U1', slot: 0 },
+      { uniteId: 'U1', slot: 1 },
+    ];
+    const locked = new Set<string>();
+
+    // Sur une journée de 7h (Lundi: créneaux 0..6), slot 3 est C4 (11h30-12h30) et slot 4 est C5 (13h30-14h30)
+    // Séparés par la pause de 1h de midi (12h30-13h30). Un bloc de 2h sur [3, 4] est strictement interdit.
+    const evaluation = evaluateMoveOrSwap(
+      planning,
+      'U1',
+      [0, 1],
+      3, // C4 + C5
+      sampleData,
+      locked
+    );
+
+    expect(evaluation.status).toBe('red');
+    expect(evaluation.reasons[0].toLowerCase()).toContain('pause');
+  });
+
+  it('calcule correctement les séances non affectées dans le bac (découpage en blocs de 2h et 1h)', async () => {
+    const { getUnassignedSessionsForEntity } = await import('../dndRulesHelper');
+    // U1 a 4h prévues pour C1, aucune placée dans planning
+    // U2 a 3h prévues pour C1, 1h placée
+    const planning = [
+      { uniteId: 'U2', slot: 0 }, // Reste 2h pour U2
+    ];
+
+    const unassigned = getUnassignedSessionsForEntity(sampleData, planning, { type: 'class', id: 'C1' });
+
+    // U1 (4h restantes) => deux blocs de 2h
+    // U2 (2h restantes) => un bloc de 2h
+    const u1Items = unassigned.filter((item) => item.uniteId === 'U1');
+    expect(u1Items).toHaveLength(2);
+    expect(u1Items.every((item) => item.duration === 2 && item.isBlock2h)).toBe(true);
+
+    const u2Items = unassigned.filter((item) => item.uniteId === 'U2');
+    expect(u2Items).toHaveLength(1);
+    expect(u2Items[0].duration === 2 && u2Items[0].isBlock2h).toBe(true);
+  });
+
+  it('permet de placer une séance depuis le bac vers un créneau libre', async () => {
+    const { executePlaceFromBin } = await import('../dndRulesHelper');
+    const planning: import('../../rules/types').Planning = [];
+    const locked = new Set<string>();
+
+    const res = executePlaceFromBin(
+      planning,
+      'U1',
+      true, // Bloc de 2h
+      0,    // Lundi C1-C2
+      sampleData,
+      locked,
+      undefined,
+      { type: 'class', id: 'C1' }
+    );
+
+    expect(res.success).toBe(true);
+    expect(res.isSwap).toBe(false);
+    expect(res.newPlanning).toHaveLength(2);
+    expect(res.newPlanning).toContainEqual({ uniteId: 'U1', slot: 0 });
+    expect(res.newPlanning).toContainEqual({ uniteId: 'U1', slot: 1 });
+  });
+
+  it('retire une séance de la grille vers le bac avec executeUnassignToBin', async () => {
+    const { executeUnassignToBin } = await import('../dndRulesHelper');
+    const planning = [
+      { uniteId: 'U1', slot: 0 },
+      { uniteId: 'U1', slot: 1 },
+      { uniteId: 'U2', slot: 8 },
+    ];
+
+    const res = executeUnassignToBin(planning, 'U1', [0, 1]);
+    expect(res.success).toBe(true);
+    expect(res.newPlanning).toHaveLength(1);
+    expect(res.newPlanning).toEqual([{ uniteId: 'U2', slot: 8 }]);
+  });
 });

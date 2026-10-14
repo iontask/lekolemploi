@@ -15,6 +15,8 @@ export interface SolverConfig {
   timeLimitSeconds: number;
   /** Activer la phase B avec HiGHS (si désactivé, utilise uniquement la phase A) */
   enablePhaseB: boolean;
+  /** Règle générale des blocs de 2h consécutives applicable à toutes les matières (défaut true) */
+  toutesMatieresABlocs?: boolean;
   /** Matières à blocs (défaut : ['Arabe', 'Anglais']) */
   matieresABlocs: string[];
   /** Seuil max d'heures par jour et unité (défaut : 2) */
@@ -39,6 +41,8 @@ export interface SolverConfig {
   forbiddenSlotsClasses?: import('../rules/types').ForbiddenSlotPerClass[];
   /** Plages interdites par prof */
   forbiddenSlotsTeachers?: import('../rules/types').ForbiddenSlotPerTeacher[];
+  /** Préférer des blocs de 2h consécutives pour toute matière > 2h (défaut : true) */
+  prefererBlocs2hMemeJour?: boolean;
   /** Mode relâché : règles souples assouplies en cas d'infaisabilité */
   relaxedMode?: boolean;
 }
@@ -46,7 +50,9 @@ export interface SolverConfig {
 export const DEFAULT_SOLVER_CONFIG: SolverConfig = {
   timeLimitSeconds: 120,
   enablePhaseB: true,
+  toutesMatieresABlocs: true,
   matieresABlocs: ['Arabe', 'Anglais'],
+  prefererBlocs2hMemeJour: true,
   maxHeuresParJourUnite: 2,
   maxHeuresParJourProf: 6,
   maxHeuresParJourClasse: 6,

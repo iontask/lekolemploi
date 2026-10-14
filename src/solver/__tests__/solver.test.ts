@@ -128,6 +128,87 @@ describe('Module solver - Phase A & LP Model Builder', () => {
       const tightPlaced = planning.filter((a) => a.uniteId === uniteMargeNulle.id);
       expect(tightPlaced.length).toBe(6);
     });
+
+    it('place de préférence les matières > 2h en créneaux suivis (ex: 4h = 2h+2h, 7h = 2h/j x3 + 1h)', () => {
+      const profPC: Teacher = {
+        id: 'p_pc',
+        nom: 'PC Teacher',
+        matiere: 'Physique-Chimie',
+        dispo: new Array(32).fill(true),
+      };
+
+      const unitePC4h: Unite = {
+        id: 'u_pc_4h',
+        teacherId: profPC.id,
+        classeIds: [classe1.id],
+        heures: 4,
+      };
+
+      const uniteMath7h: Unite = {
+        id: 'u_math_7h',
+        teacherId: profMath.id,
+        classeIds: [classe2.id],
+        heures: 7,
+      };
+
+      const testMultiData: ScheduleData = {
+        teachers: [profPC, profMath],
+        classes: [classe1, classe2],
+        unites: [unitePC4h, uniteMath7h],
+        semaine: semaineStandard,
+      };
+
+      const planning = solvePhaseA(testMultiData, DEFAULT_SOLVER_CONFIG);
+      const violations = verify(planning, testMultiData, DEFAULT_SOLVER_CONFIG);
+      expect(violations.filter((v) => v.severite === 'DURE')).toHaveLength(0);
+
+      // Vérifier pour PC 4h : 2 blocs de 2h sur 2 jours distincts, chaque bloc consécutif
+      const pcSlots = planning
+        .filter((a) => a.uniteId === unitePC4h.id)
+        .map((a) => a.slot)
+        .sort((a, b) => a - b);
+      expect(pcSlots).toHaveLength(4);
+
+      // Vérifier pour Math 7h : 7 heures au total, au plus 2h par jour, 3 jours de 2h consécutives et 1 jour de 1h
+      const mathSlots = planning
+        .filter((a) => a.uniteId === uniteMath7h.id)
+        .map((a) => a.slot)
+        .sort((a, b) => a - b);
+      expect(mathSlots).toHaveLength(7);
+
+      const mathDays = new Map<number, number[]>();
+      for (const s of mathSlots) {
+        // Déterminer jour (0..4)
+        let acc = 0;
+        let day = 0;
+        for (let j = 0; j < semaineStandard.jours.length; j++) {
+          if (s < acc + semaineStandard.creneauxParJour[j]) {
+            day = j;
+            break;
+          }
+          acc += semaineStandard.creneauxParJour[j];
+        }
+        const list = mathDays.get(day) || [];
+        list.push(s);
+        mathDays.set(day, list);
+      }
+
+      // 4 jours distincts au total (3 jours avec 2h consécutives et 1 jour avec 1h)
+      expect(mathDays.size).toBe(4);
+      let daysWith2h = 0;
+      let daysWith1h = 0;
+      for (const slots of mathDays.values()) {
+        expect(slots.length).toBeLessThanOrEqual(2);
+        if (slots.length === 2) {
+          daysWith2h++;
+          expect(slots[1]).toBe(slots[0] + 1); // Strictly consecutive!
+        } else if (slots.length === 1) {
+          daysWith1h++;
+        }
+      }
+      expect(daysWith2h).toBe(3);
+      expect(daysWith1h).toBe(1);
+    });
   });
 
   describe('buildLpModel (CPLEX LP)', () => {

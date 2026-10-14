@@ -4,7 +4,13 @@
  */
 
 import { Classe, Teacher, Unite } from '../types';
-import { canPlace, getSlotCoordinates, isBlockSubject, verify } from '../rules';
+import {
+  areSlotsConsecutiveWithoutPause,
+  canPlace,
+  getSlotCoordinates,
+  isBlockSubject,
+  verify,
+} from '../rules';
 import { Affectation, Planning, ScheduleData } from '../rules/types';
 import { SolverConfig } from './types';
 
@@ -21,7 +27,9 @@ interface SortedUnitInfo {
  * Phase A : Heuristique constructive « Difficiles d'abord » avec backtracking borné.
  * - Priorité absolue aux professeurs à marge nulle
  * - Priorité aux unités multi-classes (cours communs)
- * - Priorité aux matières à blocs (Arabe, Anglais)
+ * - Règle des blocs de 2h consécutives le même jour pour toutes les matières
+ * - Respect de la pause de 1h après 4h (entre C4 et C5) : aucun bloc de 2h à cheval
+ * - Découpage des charges paires en 2h et impaires en 2h + 1h isolée un autre jour
  * - Respect strict de toutes les règles dures du module rules
  * - Exécution rapide (quelques secondes)
  */
@@ -48,7 +56,7 @@ export function solvePhaseA(
   const unitInfos: SortedUnitInfo[] = unites.map((unite) => {
     const teacher = teachers.find((t) => t.id === unite.teacherId)!;
     const margin = teacherMarginMap.get(unite.teacherId) ?? 99;
-    const isBlock = isBlockSubject(teacher.matiere, config.matieresABlocs);
+    const isBlock = isBlockSubject(teacher.matiere, config.matieresABlocs, config.toutesMatieresABlocs !== false);
     return {
       unite,
       teacher,
@@ -62,7 +70,7 @@ export function solvePhaseA(
   // Tri « Difficiles d'abord » :
   // (1) Marge enseignant croissante (marge nulle d'abord !)
   // (2) Nombre de classes décroissant (cours communs multi-classes en premier)
-  // (3) Matière à blocs (Arabe, Anglais en priorité pour former les blocs de 2h)
+  // (3) Matière à blocs (en priorité pour former les blocs de 2h)
   // (4) Nombre d'heures décroissant
   unitInfos.sort((a, b) => {
     if (a.teacherMargin !== b.teacherMargin) {
@@ -78,16 +86,21 @@ export function solvePhaseA(
   });
 
   // Décomposition de la semaine en paires de créneaux consécutifs par jour
+  // Exclut rigoureusement le franchissement de la pause méridienne de 1h entre C4 et C5 dans les journées de 7h
   const validBlockPairs: { slot1: number; slot2: number; jourIndex: number }[] = [];
   let slotCursor = 0;
   for (let j = 0; j < semaine.jours.length; j++) {
     const daySlots = semaine.creneauxParJour[j];
     for (let c = 0; c < daySlots - 1; c++) {
-      validBlockPairs.push({
-        slot1: slotCursor + c,
-        slot2: slotCursor + c + 1,
-        jourIndex: j,
-      });
+      const s1 = slotCursor + c;
+      const s2 = slotCursor + c + 1;
+      if (areSlotsConsecutiveWithoutPause(s1, s2, semaine)) {
+        validBlockPairs.push({
+          slot1: s1,
+          slot2: s2,
+          jourIndex: j,
+        });
+      }
     }
     slotCursor += daySlots;
   }
@@ -134,15 +147,18 @@ export function solvePhaseA(
       const remainingHeures = Math.max(0, heures - alreadyPlaced);
       if (remainingHeures === 0) continue;
 
-      if (isBlock) {
-        // --- PLACEMENT D'UNE MATIÈRE À BLOCS (Arabe / Anglais) ---
-        // Doit former des blocs de 2h consécutives le même jour
-        // Une heure isolée seulement si charge impaire
+      const isStrictBlock = isBlock; // Matière obligatoire à blocs (Arabe / Anglais)
+      const shouldPreferBlocks =
+        isStrictBlock || (config.prefererBlocs2hMemeJour !== false && remainingHeures >= 2);
+
+      if (shouldPreferBlocks) {
+        // --- PLACEMENT EN BLOCS DE 2H CONSÉCUTIVES SUR JOURS DISTINCTS ---
+        // Ex: 4h = 2h + 2h (2 jours distincts, créneaux suivis)
+        // Ex: 7h = 2h/j x 3 + 1h un autre jour
         const numberOf2hBlocks = Math.floor(remainingHeures / 2);
         const has1hIsolated = remainingHeures % 2 !== 0;
 
-        // Trouver des paires de créneaux consécutifs compatibles
-        // Filtrer les paires où le prof est dispo et canPlace est ok pour les deux
+        // Trouver des paires de créneaux consécutifs compatibles le même jour
         const candidatePairs = validBlockPairs.filter((p) => {
           if (!teacher.dispo[p.slot1] || !teacher.dispo[p.slot2]) return false;
           const cp1 = canPlace(currentPlanning, unite, p.slot1, data, config);
@@ -153,7 +169,7 @@ export function solvePhaseA(
           return cp2.ok;
         });
 
-        // Ordonner les paires par compacité (matinées de début de semaine d'abord)
+        // Ordonner les paires par compacité (matinées et début de semaine)
         candidatePairs.sort((pA, pB) => {
           const cA = getSlotCoordinates(pA.slot1, semaine);
           const cB = getSlotCoordinates(pB.slot1, semaine);
@@ -162,15 +178,14 @@ export function solvePhaseA(
           return costA - costB + (attempt > 0 ? (Math.random() - 0.5) * 1.5 : 0);
         });
 
-        // Sélectionner les blocs sur des jours différents
+        // Sélectionner les blocs sur des jours différents (au plus 2h par jour)
         const placedDays = new Set<number>();
         let blocksPlaced = 0;
 
         for (const pair of candidatePairs) {
           if (blocksPlaced >= numberOf2hBlocks) break;
-          if (placedDays.has(pair.jourIndex)) continue; // Pas plus de 2h par jour
+          if (placedDays.has(pair.jourIndex)) continue; // 1 bloc max par jour pour cette matière
 
-          // Vérifier à nouveau avec l'état actuel du planning
           const cp1 = canPlace(currentPlanning, unite, pair.slot1, data, config);
           if (!cp1.ok) continue;
 
@@ -178,7 +193,6 @@ export function solvePhaseA(
           const cp2 = canPlace(currentPlanning, unite, pair.slot2, data, config);
 
           if (!cp2.ok) {
-            // Annuler
             currentPlanning.pop();
             continue;
           }
@@ -188,39 +202,58 @@ export function solvePhaseA(
           blocksPlaced++;
         }
 
-        if (blocksPlaced < numberOf2hBlocks) {
+        // Si matière obligatoire à blocs et qu'on n'a pas pu placer tous les blocs de 2h
+        if (isStrictBlock && blocksPlaced < numberOf2hBlocks) {
           success = false;
-          break; // Échec pour cette unité, tenter un autre restart
+          break;
         }
 
-        // Si charge impaire : placer l'heure isolée restante sur un autre jour
-        if (has1hIsolated) {
-          const singleCandidates = Array.from({ length: totalSlots }, (_, i) => i)
-            .filter((s) => {
-              const coords = getSlotCoordinates(s, semaine);
-              if (placedDays.has(coords.jourIndex)) return false; // Jour différent des blocs de 2h
-              return canPlace(currentPlanning, unite, s, data, config).ok;
-            })
-            .sort((sA, sB) => {
-              const cA = getSlotCoordinates(sA, semaine);
-              const cB = getSlotCoordinates(sB, semaine);
-              return cA.rangHeure - cB.rangHeure + (attempt > 0 ? (Math.random() - 0.5) * 2 : 0);
-            });
+        // Placer les heures restantes : soit l'heure isolée (ex: 7h = 3 blocs de 2h + 1h),
+        // soit les heures qu'on n'a pas pu grouper en 2h pour les matières standard
+        const hoursStillToPlace = remainingHeures - blocksPlaced * 2;
+        if (hoursStillToPlace > 0) {
+          for (let rem = 0; rem < hoursStillToPlace; rem++) {
+            // Privilégier un jour différent où cette unité n'a pas encore de cours
+            const singleCandidates = Array.from({ length: totalSlots }, (_, i) => i)
+              .filter((s) => {
+                const coords = getSlotCoordinates(s, semaine);
+                if (placedDays.has(coords.jourIndex) && hoursStillToPlace === 1 && !isStrictBlock) {
+                  return false;
+                }
+                return canPlace(currentPlanning, unite, s, data, config).ok;
+              })
+              .sort((sA, sB) => {
+                const cA = getSlotCoordinates(sA, semaine);
+                const cB = getSlotCoordinates(sB, semaine);
+                return cA.rangHeure - cB.rangHeure + (attempt > 0 ? (Math.random() - 0.5) * 2 : 0);
+              });
 
-          if (singleCandidates.length === 0) {
-            success = false;
-            break;
+            const finalCandidates =
+              singleCandidates.length > 0
+                ? singleCandidates
+                : Array.from({ length: totalSlots }, (_, i) => i)
+                    .filter((s) => canPlace(currentPlanning, unite, s, data, config).ok)
+                    .sort((sA, sB) => {
+                      const cA = getSlotCoordinates(sA, semaine);
+                      const cB = getSlotCoordinates(sB, semaine);
+                      return cA.rangHeure - cB.rangHeure;
+                    });
+
+            if (finalCandidates.length === 0) {
+              success = false;
+              break;
+            }
+
+            const chosen = finalCandidates[0];
+            currentPlanning.push({ uniteId: unite.id, slot: chosen });
+            placedDays.add(getSlotCoordinates(chosen, semaine).jourIndex);
           }
-
-          currentPlanning.push({ uniteId: unite.id, slot: singleCandidates[0] });
         }
       } else {
-        // --- PLACEMENT D'UNE MATIÈRE STANDARD ---
-        // Placer les 'heures' une par une en respectant canPlace
+        // --- PLACEMENT D'UNE MATIÈRE STANDARD (1h) ---
         let hoursPlacedForUnit = 0;
 
         for (let h = 0; h < remainingHeures; h++) {
-          // Rechercher les créneaux valides
           const candidateSlots = Array.from({ length: totalSlots }, (_, i) => i)
             .filter((s) => canPlace(currentPlanning, unite, s, data, config).ok)
             .sort((sA, sB) => {
@@ -243,7 +276,6 @@ export function solvePhaseA(
                 return hoursTodayA - hoursTodayB;
               }
 
-              // Compacité temporelle (matinée et début de semaine)
               const costA = cA.rangHeure * 1.0 + cA.rangJour * 0.3;
               const costB = cB.rangHeure * 1.0 + cB.rangJour * 0.3;
               return costA - costB + (attempt > 0 ? (Math.random() - 0.5) * 1.0 : 0);

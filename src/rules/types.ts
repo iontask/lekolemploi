@@ -72,8 +72,14 @@ export interface ForbiddenSlotPerTeacher {
 }
 
 export interface RulesOptions {
-  /** Matières nécessitant des blocs de 2h consécutives (par défaut Arabe et Anglais) */
+  /** Règle générale des blocs de 2h consécutives applicable à toutes les matières (défaut true) */
+  toutesMatieresABlocs?: boolean;
+  /** Respecter la pause méridienne de 1h après 4h : interdit tout bloc de 2h entre C4 et C5 (défaut true) */
+  respecterPauseMidiBlocs?: boolean;
+  /** Matières nécessitant des blocs de 2h consécutives si toutesMatieresABlocs est false (par défaut Arabe et Anglais) */
   matieresABlocs?: string[];
+  /** Préférer des blocs de 2h consécutives pour toute matière > 2h (ex: 4h = 2h+2h, 7h = 2h*3 + 1h) */
+  prefererBlocs2hMemeJour?: boolean;
   /** Seuil max d'heures par jour pour une unité (défaut 2) */
   maxHeuresParJourUnite?: number;
   /** Max d'heures par jour pour un enseignant (défaut 6) */

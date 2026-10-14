@@ -12,6 +12,8 @@ import { analyzeScheduleExceptions } from '../utils/scheduleExceptions';
 import { exportTimetableMultiSheetsExcel } from '../services/timetableExporter';
 import {
   executeMoveOrSwap,
+  executePlaceFromBin,
+  executeUnassignToBin,
   getBlockSlotsForAssignment,
   getLockKey,
 } from '../utils/dndRulesHelper';
@@ -186,7 +188,8 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
   const handleMoveCourse = (
     sourceUniteId: string,
     sourceSlots: number[],
-    targetSlot: number
+    targetSlot: number,
+    contextEntity?: { type: 'class' | 'teacher'; id: string }
   ) => {
     const res = executeMoveOrSwap(
       currentPlanning,
@@ -194,7 +197,9 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
       sourceSlots,
       targetSlot,
       dataset,
-      lockedKeys
+      lockedKeys,
+      undefined,
+      contextEntity
     );
 
     if (!res.success) {
@@ -226,6 +231,68 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
     }
 
     return { success: true, warning: res.warning };
+  };
+
+  // --- PLACEMENT D'UNE SÉANCE DEPUIS LE BAC VERS LA GRILLE ---
+  const handlePlaceFromBin = (
+    uniteId: string,
+    isBlock2h: boolean,
+    targetSlot: number,
+    contextEntity?: { type: 'class' | 'teacher'; id: string }
+  ) => {
+    const res = executePlaceFromBin(
+      currentPlanning,
+      uniteId,
+      isBlock2h,
+      targetSlot,
+      dataset,
+      lockedKeys,
+      undefined,
+      contextEntity
+    );
+
+    if (!res.success) {
+      setToast({
+        text: `Placement refusé : ${res.error}`,
+        type: 'error',
+      });
+      return { success: false, error: res.error };
+    }
+
+    const newHistory = history.slice(0, historyIndex + 1).concat([res.newPlanning]);
+    setHistory(newHistory);
+    setHistoryIndex(newHistory.length - 1);
+    onUpdatePlanning?.(res.newPlanning);
+
+    if (res.isSwap) {
+      setToast({
+        text: 'Séance placée ! Le cours précédent a été renvoyé dans le bac de réserve.',
+        type: 'warning',
+      });
+    } else {
+      setToast({
+        text: `Séance (${isBlock2h ? 'bloc de 2h' : '1h'}) placée avec succès sur l'emploi du temps !`,
+        type: 'success',
+      });
+    }
+
+    return { success: true, warning: res.warning };
+  };
+
+  // --- RETRAIT D'UN COURS VERS LE BAC DE RÉSERVE ---
+  const handleUnassignToBin = (uniteId: string, slots: number[]) => {
+    const res = executeUnassignToBin(currentPlanning, uniteId, slots);
+    const newHistory = history.slice(0, historyIndex + 1).concat([res.newPlanning]);
+    setHistory(newHistory);
+    setHistoryIndex(newHistory.length - 1);
+    onUpdatePlanning?.(res.newPlanning);
+
+    setToast({
+      text: `Séance (${slots.length}h) retirée de l'emploi du temps et déposée dans le bac de réserve.`,
+      type: 'info',
+    });
+
+    return { success: true };
   };
 
   // --- RELANCER LE SOLVEUR AVEC LES COURS VERROUILLÉS FIXÉS ---
@@ -545,6 +612,8 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
             lockedKeys={lockedKeys}
             onToggleLock={handleToggleLock}
             onMoveCourse={handleMoveCourse}
+            onPlaceFromBin={handlePlaceFromBin}
+            onUnassignToBin={handleUnassignToBin}
           />
         )}
 
