@@ -60,3 +60,20 @@ npm run build
 
 - **28 enseignants**, **12 classes** (1APIC-1 à 2BACSE), **360 heures exactes**.
 - **100 % des heures placées**, **0 conflit dur**, blocs Arabe/Anglais strictement respectés.
+
+---
+
+## 🌐 Déploiement Automatisé sur GitHub Pages (Actions)
+
+Le projet intègre un workflow GitHub Actions prêt à l'emploi (`.github/workflows/deploy.yml`) :
+
+1. **Activation sur GitHub** :
+   - Rendez-vous sur votre dépôt GitHub : **Settings** > **Pages**.
+   - Dans la section **Build and deployment** > **Source**, choisissez **GitHub Actions**.
+2. **Déploiement automatique** :
+   - À chaque `push` sur la branche `main` ou `master`, le workflow :
+     - Vérifie l'ensemble des 55 tests Vitest (`npm test`).
+     - Compile l'application (`npm run build`) avec chemins relatifs (`base: './'`).
+     - Génère la protection `.nojekyll` et le fallback SPA `404.html`.
+     - Déploie le site sur `https://<votre-compte>.github.io/<nom-du-depot>/`.
+
