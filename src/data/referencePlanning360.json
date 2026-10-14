@@ -1,0 +1,3690 @@
+{
+  "dataset": {
+    "id": "ds_reference_360h",
+    "importedAt": "2026-10-13T17:14:48.460Z",
+    "fileName": "Emploi_du_Temps_Reference_360h.xlsx",
+    "semaine": {
+      "jours": [
+        "Lundi",
+        "Mardi",
+        "Mercredi",
+        "Jeudi",
+        "Vendredi"
+      ],
+      "creneauxParJour": [
+        7,
+        7,
+        7,
+        7,
+        4
+      ]
+    },
+    "config": {
+      "headerRowClasses": 2,
+      "teacherStartRow": 3,
+      "teacherEndRow": 30,
+      "colNum": "A",
+      "colMatiere": "B",
+      "colNom": "C",
+      "colPrenom": "D",
+      "colCreneauxStart": "E",
+      "colCreneauxEnd": "AJ",
+      "colClassesStart": "AK",
+      "colClassesEnd": "AV",
+      "semaine": {
+        "jours": [
+          "Lundi",
+          "Mardi",
+          "Mercredi",
+          "Jeudi",
+          "Vendredi"
+        ],
+        "creneauxParJour": [
+          7,
+          7,
+          7,
+          7,
+          4
+        ]
+      },
+      "colorAvailableHex": "FFFFFF00",
+      "colorUnavailableHex": "FFFF0000",
+      "detectNumericFallback": true
+    },
+    "teachers": [
+      {
+        "id": "t_1",
+        "num": 1,
+        "nom": "EL ALAMI Karim",
+        "matiere": "Mathématiques",
+        "dispo": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "id": "t_2",
+        "num": 2,
+        "nom": "BENJELLOUN Fatima",
+        "matiere": "Mathématiques",
+        "dispo": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          false,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "id": "t_3",
+        "num": 3,
+        "nom": "TAHIRI Rachid",
+        "matiere": "Mathématiques",
+        "dispo": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "id": "t_4",
+        "num": 4,
+        "nom": "OUAZZANI Samir",
+        "matiere": "Mathématiques",
+        "dispo": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "id": "t_5",
+        "num": 5,
+        "nom": "IDRISSI Hassan",
+        "matiere": "Physique-Chimie",
+        "dispo": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          false,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "id": "t_6",
+        "num": 6,
+        "nom": "CHRAIBI Nadia",
+        "matiere": "Physique-Chimie",
+        "dispo": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "id": "t_7",
+        "num": 7,
+        "nom": "MEKOUAR Omar",
+        "matiere": "Physique-Chimie",
+        "dispo": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "id": "t_8",
+        "num": 8,
+        "nom": "BOUZIDI Meriem",
+        "matiere": "SVT",
+        "dispo": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          false,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "id": "t_9",
+        "num": 9,
+        "nom": "AMRANI Adil",
+        "matiere": "SVT",
+        "dispo": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "id": "t_10",
+        "num": 10,
+        "nom": "KABBAJ Souad",
+        "matiere": "SVT",
+        "dispo": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "id": "t_11",
+        "num": 11,
+        "nom": "BERRADA Zineb",
+        "matiere": "Français",
+        "dispo": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          false,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "id": "t_12",
+        "num": 12,
+        "nom": "SLAOUI Mehdi",
+        "matiere": "Français",
+        "dispo": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "id": "t_13",
+        "num": 13,
+        "nom": "NACIRI Kenza",
+        "matiere": "Français",
+        "dispo": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "id": "t_14",
+        "num": 14,
+        "nom": "ZEGHARI Youssef",
+        "matiere": "Français",
+        "dispo": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          false,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "id": "t_15",
+        "num": 15,
+        "nom": "FILALI Abdellah",
+        "matiere": "Arabe",
+        "dispo": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "id": "t_16",
+        "num": 16,
+        "nom": "LAHLOU Amina",
+        "matiere": "Arabe",
+        "dispo": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "id": "t_17",
+        "num": 17,
+        "nom": "BENNANI Mustapha",
+        "matiere": "Arabe",
+        "dispo": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          false,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "id": "t_18",
+        "num": 18,
+        "nom": "SEKKAT Khadija",
+        "matiere": "Arabe",
+        "dispo": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "id": "t_19",
+        "num": 19,
+        "nom": "HASSANI Jamal",
+        "matiere": "Anglais",
+        "dispo": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "id": "t_20",
+        "num": 20,
+        "nom": "MANSOURI Tariq",
+        "matiere": "Anglais",
+        "dispo": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          false,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "id": "t_21",
+        "num": 21,
+        "nom": "EL FASSI Houda",
+        "matiere": "Anglais",
+        "dispo": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "id": "t_22",
+        "num": 22,
+        "nom": "TOUIMI Salma",
+        "matiere": "Histoire-Géo",
+        "dispo": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "id": "t_23",
+        "num": 23,
+        "nom": "GUEDIRA Nabil",
+        "matiere": "Histoire-Géo",
+        "dispo": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          false,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "id": "t_24",
+        "num": 24,
+        "nom": "ALAMI OUAHABI Bouchra",
+        "matiere": "Histoire-Géo",
+        "dispo": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "id": "t_25",
+        "num": 25,
+        "nom": "RHANMI Abdelali",
+        "matiere": "Éduc. Islamique",
+        "dispo": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      {
+        "id": "t_26",
+        "num": 26,
+        "nom": "BENCHEIKH Mouna",
+        "matiere": "Éduc. Islamique",
+        "dispo": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          false,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "id": "t_27",
+        "num": 27,
+        "nom": "DERKAOUI Hamza",
+        "matiere": "Philosophie",
+        "dispo": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      {
+        "id": "t_28",
+        "num": 28,
+        "nom": "ZOUITEN Latifa",
+        "matiere": "Informatique",
+        "dispo": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          false,
+          false,
+          false
+        ]
+      }
+    ],
+    "classes": [
+      {
+        "id": "cls_0",
+        "nom": "1APIC-1",
+        "niveau": "1APIC"
+      },
+      {
+        "id": "cls_1",
+        "nom": "1APIC-2",
+        "niveau": "1APIC"
+      },
+      {
+        "id": "cls_2",
+        "nom": "2APIC-1",
+        "niveau": "2APIC"
+      },
+      {
+        "id": "cls_3",
+        "nom": "2APIC-2",
+        "niveau": "2APIC"
+      },
+      {
+        "id": "cls_4",
+        "nom": "3APIC-1",
+        "niveau": "3APIC"
+      },
+      {
+        "id": "cls_5",
+        "nom": "3APIC-2",
+        "niveau": "3APIC"
+      },
+      {
+        "id": "cls_6",
+        "nom": "TCSF-1",
+        "niveau": "TCSF"
+      },
+      {
+        "id": "cls_7",
+        "nom": "TCSF-2",
+        "niveau": "TCSF"
+      },
+      {
+        "id": "cls_8",
+        "nom": "1BACSEF",
+        "niveau": "1BAC"
+      },
+      {
+        "id": "cls_9",
+        "nom": "1BACSEG",
+        "niveau": "1BAC"
+      },
+      {
+        "id": "cls_10",
+        "nom": "2BACSPF",
+        "niveau": "2BAC"
+      },
+      {
+        "id": "cls_11",
+        "nom": "2BACSE",
+        "niveau": "2BAC"
+      }
+    ],
+    "unites": [
+      {
+        "id": "u_0",
+        "teacherId": "t_1",
+        "classeIds": [
+          "cls_0"
+        ],
+        "heures": 5,
+        "estCommun": false
+      },
+      {
+        "id": "u_1",
+        "teacherId": "t_1",
+        "classeIds": [
+          "cls_1"
+        ],
+        "heures": 5,
+        "estCommun": false
+      },
+      {
+        "id": "u_2",
+        "teacherId": "t_1",
+        "classeIds": [
+          "cls_2"
+        ],
+        "heures": 5,
+        "estCommun": false
+      },
+      {
+        "id": "u_3",
+        "teacherId": "t_2",
+        "classeIds": [
+          "cls_3"
+        ],
+        "heures": 5,
+        "estCommun": false
+      },
+      {
+        "id": "u_4",
+        "teacherId": "t_2",
+        "classeIds": [
+          "cls_4"
+        ],
+        "heures": 5,
+        "estCommun": false
+      },
+      {
+        "id": "u_5",
+        "teacherId": "t_2",
+        "classeIds": [
+          "cls_5"
+        ],
+        "heures": 5,
+        "estCommun": false
+      },
+      {
+        "id": "u_6",
+        "teacherId": "t_3",
+        "classeIds": [
+          "cls_6"
+        ],
+        "heures": 5,
+        "estCommun": false
+      },
+      {
+        "id": "u_7",
+        "teacherId": "t_3",
+        "classeIds": [
+          "cls_7"
+        ],
+        "heures": 5,
+        "estCommun": false
+      },
+      {
+        "id": "u_8",
+        "teacherId": "t_3",
+        "classeIds": [
+          "cls_8"
+        ],
+        "heures": 5,
+        "estCommun": false
+      },
+      {
+        "id": "u_9",
+        "teacherId": "t_4",
+        "classeIds": [
+          "cls_9"
+        ],
+        "heures": 5,
+        "estCommun": false
+      },
+      {
+        "id": "u_10",
+        "teacherId": "t_4",
+        "classeIds": [
+          "cls_10"
+        ],
+        "heures": 5,
+        "estCommun": false
+      },
+      {
+        "id": "u_11",
+        "teacherId": "t_4",
+        "classeIds": [
+          "cls_11"
+        ],
+        "heures": 5,
+        "estCommun": false
+      },
+      {
+        "id": "u_12",
+        "teacherId": "t_5",
+        "classeIds": [
+          "cls_0"
+        ],
+        "heures": 3,
+        "estCommun": false
+      },
+      {
+        "id": "u_13",
+        "teacherId": "t_5",
+        "classeIds": [
+          "cls_1"
+        ],
+        "heures": 3,
+        "estCommun": false
+      },
+      {
+        "id": "u_14",
+        "teacherId": "t_5",
+        "classeIds": [
+          "cls_2"
+        ],
+        "heures": 3,
+        "estCommun": false
+      },
+      {
+        "id": "u_15",
+        "teacherId": "t_5",
+        "classeIds": [
+          "cls_3"
+        ],
+        "heures": 3,
+        "estCommun": false
+      },
+      {
+        "id": "u_16",
+        "teacherId": "t_6",
+        "classeIds": [
+          "cls_4"
+        ],
+        "heures": 4,
+        "estCommun": false
+      },
+      {
+        "id": "u_17",
+        "teacherId": "t_6",
+        "classeIds": [
+          "cls_5"
+        ],
+        "heures": 4,
+        "estCommun": false
+      },
+      {
+        "id": "u_18",
+        "teacherId": "t_6",
+        "classeIds": [
+          "cls_6"
+        ],
+        "heures": 4,
+        "estCommun": false
+      },
+      {
+        "id": "u_19",
+        "teacherId": "t_6",
+        "classeIds": [
+          "cls_7"
+        ],
+        "heures": 4,
+        "estCommun": false
+      },
+      {
+        "id": "u_20",
+        "teacherId": "t_7",
+        "classeIds": [
+          "cls_8"
+        ],
+        "heures": 4,
+        "estCommun": false
+      },
+      {
+        "id": "u_21",
+        "teacherId": "t_7",
+        "classeIds": [
+          "cls_9"
+        ],
+        "heures": 4,
+        "estCommun": false
+      },
+      {
+        "id": "u_22",
+        "teacherId": "t_7",
+        "classeIds": [
+          "cls_10"
+        ],
+        "heures": 5,
+        "estCommun": false
+      },
+      {
+        "id": "u_23",
+        "teacherId": "t_7",
+        "classeIds": [
+          "cls_11"
+        ],
+        "heures": 5,
+        "estCommun": false
+      },
+      {
+        "id": "u_24",
+        "teacherId": "t_8",
+        "classeIds": [
+          "cls_0"
+        ],
+        "heures": 3,
+        "estCommun": false
+      },
+      {
+        "id": "u_25",
+        "teacherId": "t_8",
+        "classeIds": [
+          "cls_1"
+        ],
+        "heures": 3,
+        "estCommun": false
+      },
+      {
+        "id": "u_26",
+        "teacherId": "t_8",
+        "classeIds": [
+          "cls_2"
+        ],
+        "heures": 3,
+        "estCommun": false
+      },
+      {
+        "id": "u_27",
+        "teacherId": "t_8",
+        "classeIds": [
+          "cls_3"
+        ],
+        "heures": 3,
+        "estCommun": false
+      },
+      {
+        "id": "u_28",
+        "teacherId": "t_9",
+        "classeIds": [
+          "cls_4"
+        ],
+        "heures": 3,
+        "estCommun": false
+      },
+      {
+        "id": "u_29",
+        "teacherId": "t_9",
+        "classeIds": [
+          "cls_5"
+        ],
+        "heures": 3,
+        "estCommun": false
+      },
+      {
+        "id": "u_30",
+        "teacherId": "t_9",
+        "classeIds": [
+          "cls_6"
+        ],
+        "heures": 3,
+        "estCommun": false
+      },
+      {
+        "id": "u_31",
+        "teacherId": "t_9",
+        "classeIds": [
+          "cls_7"
+        ],
+        "heures": 3,
+        "estCommun": false
+      },
+      {
+        "id": "u_32",
+        "teacherId": "t_10",
+        "classeIds": [
+          "cls_8"
+        ],
+        "heures": 4,
+        "estCommun": false
+      },
+      {
+        "id": "u_33",
+        "teacherId": "t_10",
+        "classeIds": [
+          "cls_9"
+        ],
+        "heures": 4,
+        "estCommun": false
+      },
+      {
+        "id": "u_34",
+        "teacherId": "t_10",
+        "classeIds": [
+          "cls_10"
+        ],
+        "heures": 4,
+        "estCommun": false
+      },
+      {
+        "id": "u_35",
+        "teacherId": "t_10",
+        "classeIds": [
+          "cls_11"
+        ],
+        "heures": 4,
+        "estCommun": false
+      },
+      {
+        "id": "u_36",
+        "teacherId": "t_11",
+        "classeIds": [
+          "cls_0"
+        ],
+        "heures": 5,
+        "estCommun": false
+      },
+      {
+        "id": "u_37",
+        "teacherId": "t_11",
+        "classeIds": [
+          "cls_1"
+        ],
+        "heures": 5,
+        "estCommun": false
+      },
+      {
+        "id": "u_38",
+        "teacherId": "t_11",
+        "classeIds": [
+          "cls_2"
+        ],
+        "heures": 5,
+        "estCommun": false
+      },
+      {
+        "id": "u_39",
+        "teacherId": "t_12",
+        "classeIds": [
+          "cls_3"
+        ],
+        "heures": 5,
+        "estCommun": false
+      },
+      {
+        "id": "u_40",
+        "teacherId": "t_12",
+        "classeIds": [
+          "cls_4"
+        ],
+        "heures": 5,
+        "estCommun": false
+      },
+      {
+        "id": "u_41",
+        "teacherId": "t_12",
+        "classeIds": [
+          "cls_5"
+        ],
+        "heures": 5,
+        "estCommun": false
+      },
+      {
+        "id": "u_42",
+        "teacherId": "t_13",
+        "classeIds": [
+          "cls_6"
+        ],
+        "heures": 4,
+        "estCommun": false
+      },
+      {
+        "id": "u_43",
+        "teacherId": "t_13",
+        "classeIds": [
+          "cls_7"
+        ],
+        "heures": 4,
+        "estCommun": false
+      },
+      {
+        "id": "u_44",
+        "teacherId": "t_13",
+        "classeIds": [
+          "cls_8"
+        ],
+        "heures": 4,
+        "estCommun": false
+      },
+      {
+        "id": "u_45",
+        "teacherId": "t_14",
+        "classeIds": [
+          "cls_9"
+        ],
+        "heures": 4,
+        "estCommun": false
+      },
+      {
+        "id": "u_46",
+        "teacherId": "t_14",
+        "classeIds": [
+          "cls_10"
+        ],
+        "heures": 4,
+        "estCommun": false
+      },
+      {
+        "id": "u_47",
+        "teacherId": "t_14",
+        "classeIds": [
+          "cls_11"
+        ],
+        "heures": 4,
+        "estCommun": false
+      },
+      {
+        "id": "u_48",
+        "teacherId": "t_15",
+        "classeIds": [
+          "cls_0"
+        ],
+        "heures": 4,
+        "estCommun": false
+      },
+      {
+        "id": "u_49",
+        "teacherId": "t_15",
+        "classeIds": [
+          "cls_1"
+        ],
+        "heures": 4,
+        "estCommun": false
+      },
+      {
+        "id": "u_50",
+        "teacherId": "t_15",
+        "classeIds": [
+          "cls_2"
+        ],
+        "heures": 4,
+        "estCommun": false
+      },
+      {
+        "id": "u_51",
+        "teacherId": "t_16",
+        "classeIds": [
+          "cls_3"
+        ],
+        "heures": 4,
+        "estCommun": false
+      },
+      {
+        "id": "u_52",
+        "teacherId": "t_16",
+        "classeIds": [
+          "cls_4"
+        ],
+        "heures": 4,
+        "estCommun": false
+      },
+      {
+        "id": "u_53",
+        "teacherId": "t_16",
+        "classeIds": [
+          "cls_5"
+        ],
+        "heures": 4,
+        "estCommun": false
+      },
+      {
+        "id": "u_54",
+        "teacherId": "t_17",
+        "classeIds": [
+          "cls_6"
+        ],
+        "heures": 3,
+        "estCommun": false
+      },
+      {
+        "id": "u_55",
+        "teacherId": "t_17",
+        "classeIds": [
+          "cls_7"
+        ],
+        "heures": 3,
+        "estCommun": false
+      },
+      {
+        "id": "u_56",
+        "teacherId": "t_17",
+        "classeIds": [
+          "cls_8"
+        ],
+        "heures": 3,
+        "estCommun": false
+      },
+      {
+        "id": "u_57",
+        "teacherId": "t_18",
+        "classeIds": [
+          "cls_9"
+        ],
+        "heures": 3,
+        "estCommun": false
+      },
+      {
+        "id": "u_58",
+        "teacherId": "t_18",
+        "classeIds": [
+          "cls_10"
+        ],
+        "heures": 3,
+        "estCommun": false
+      },
+      {
+        "id": "u_59",
+        "teacherId": "t_18",
+        "classeIds": [
+          "cls_11"
+        ],
+        "heures": 3,
+        "estCommun": false
+      },
+      {
+        "id": "u_60",
+        "teacherId": "t_19",
+        "classeIds": [
+          "cls_0"
+        ],
+        "heures": 3,
+        "estCommun": false
+      },
+      {
+        "id": "u_61",
+        "teacherId": "t_19",
+        "classeIds": [
+          "cls_1"
+        ],
+        "heures": 3,
+        "estCommun": false
+      },
+      {
+        "id": "u_62",
+        "teacherId": "t_19",
+        "classeIds": [
+          "cls_2"
+        ],
+        "heures": 3,
+        "estCommun": false
+      },
+      {
+        "id": "u_63",
+        "teacherId": "t_19",
+        "classeIds": [
+          "cls_3"
+        ],
+        "heures": 3,
+        "estCommun": false
+      },
+      {
+        "id": "u_64",
+        "teacherId": "t_20",
+        "classeIds": [
+          "cls_4"
+        ],
+        "heures": 3,
+        "estCommun": false
+      },
+      {
+        "id": "u_65",
+        "teacherId": "t_20",
+        "classeIds": [
+          "cls_5"
+        ],
+        "heures": 3,
+        "estCommun": false
+      },
+      {
+        "id": "u_66",
+        "teacherId": "t_20",
+        "classeIds": [
+          "cls_6"
+        ],
+        "heures": 3,
+        "estCommun": false
+      },
+      {
+        "id": "u_67",
+        "teacherId": "t_20",
+        "classeIds": [
+          "cls_7"
+        ],
+        "heures": 3,
+        "estCommun": false
+      },
+      {
+        "id": "u_68",
+        "teacherId": "t_21",
+        "classeIds": [
+          "cls_8"
+        ],
+        "heures": 3,
+        "estCommun": false
+      },
+      {
+        "id": "u_69",
+        "teacherId": "t_21",
+        "classeIds": [
+          "cls_9"
+        ],
+        "heures": 3,
+        "estCommun": false
+      },
+      {
+        "id": "u_70",
+        "teacherId": "t_21",
+        "classeIds": [
+          "cls_10"
+        ],
+        "heures": 3,
+        "estCommun": false
+      },
+      {
+        "id": "u_71",
+        "teacherId": "t_21",
+        "classeIds": [
+          "cls_11"
+        ],
+        "heures": 3,
+        "estCommun": false
+      },
+      {
+        "id": "u_72",
+        "teacherId": "t_22",
+        "classeIds": [
+          "cls_0"
+        ],
+        "heures": 3,
+        "estCommun": false
+      },
+      {
+        "id": "u_73",
+        "teacherId": "t_22",
+        "classeIds": [
+          "cls_1"
+        ],
+        "heures": 3,
+        "estCommun": false
+      },
+      {
+        "id": "u_74",
+        "teacherId": "t_22",
+        "classeIds": [
+          "cls_2"
+        ],
+        "heures": 3,
+        "estCommun": false
+      },
+      {
+        "id": "u_75",
+        "teacherId": "t_22",
+        "classeIds": [
+          "cls_3"
+        ],
+        "heures": 3,
+        "estCommun": false
+      },
+      {
+        "id": "u_76",
+        "teacherId": "t_23",
+        "classeIds": [
+          "cls_4"
+        ],
+        "heures": 3,
+        "estCommun": false
+      },
+      {
+        "id": "u_77",
+        "teacherId": "t_23",
+        "classeIds": [
+          "cls_5"
+        ],
+        "heures": 3,
+        "estCommun": false
+      },
+      {
+        "id": "u_78",
+        "teacherId": "t_23",
+        "classeIds": [
+          "cls_6"
+        ],
+        "heures": 3,
+        "estCommun": false
+      },
+      {
+        "id": "u_79",
+        "teacherId": "t_23",
+        "classeIds": [
+          "cls_7"
+        ],
+        "heures": 3,
+        "estCommun": false
+      },
+      {
+        "id": "u_80",
+        "teacherId": "t_24",
+        "classeIds": [
+          "cls_8"
+        ],
+        "heures": 3,
+        "estCommun": false
+      },
+      {
+        "id": "u_81",
+        "teacherId": "t_24",
+        "classeIds": [
+          "cls_9"
+        ],
+        "heures": 3,
+        "estCommun": false
+      },
+      {
+        "id": "u_82",
+        "teacherId": "t_24",
+        "classeIds": [
+          "cls_10"
+        ],
+        "heures": 2,
+        "estCommun": false
+      },
+      {
+        "id": "u_83",
+        "teacherId": "t_24",
+        "classeIds": [
+          "cls_11"
+        ],
+        "heures": 2,
+        "estCommun": false
+      },
+      {
+        "id": "u_84",
+        "teacherId": "t_25",
+        "classeIds": [
+          "cls_0"
+        ],
+        "heures": 2,
+        "estCommun": false
+      },
+      {
+        "id": "u_85",
+        "teacherId": "t_25",
+        "classeIds": [
+          "cls_1"
+        ],
+        "heures": 2,
+        "estCommun": false
+      },
+      {
+        "id": "u_86",
+        "teacherId": "t_25",
+        "classeIds": [
+          "cls_2"
+        ],
+        "heures": 2,
+        "estCommun": false
+      },
+      {
+        "id": "u_87",
+        "teacherId": "t_25",
+        "classeIds": [
+          "cls_3"
+        ],
+        "heures": 2,
+        "estCommun": false
+      },
+      {
+        "id": "u_88",
+        "teacherId": "t_25",
+        "classeIds": [
+          "cls_4"
+        ],
+        "heures": 2,
+        "estCommun": false
+      },
+      {
+        "id": "u_89",
+        "teacherId": "t_25",
+        "classeIds": [
+          "cls_5"
+        ],
+        "heures": 2,
+        "estCommun": false
+      },
+      {
+        "id": "u_90",
+        "teacherId": "t_26",
+        "classeIds": [
+          "cls_6"
+        ],
+        "heures": 2,
+        "estCommun": false
+      },
+      {
+        "id": "u_91",
+        "teacherId": "t_26",
+        "classeIds": [
+          "cls_7"
+        ],
+        "heures": 2,
+        "estCommun": false
+      },
+      {
+        "id": "u_92",
+        "teacherId": "t_26",
+        "classeIds": [
+          "cls_8",
+          "cls_9"
+        ],
+        "heures": 2,
+        "estCommun": true
+      },
+      {
+        "id": "u_93",
+        "teacherId": "t_26",
+        "classeIds": [
+          "cls_10"
+        ],
+        "heures": 2,
+        "estCommun": false
+      },
+      {
+        "id": "u_94",
+        "teacherId": "t_26",
+        "classeIds": [
+          "cls_11"
+        ],
+        "heures": 2,
+        "estCommun": false
+      },
+      {
+        "id": "u_95",
+        "teacherId": "t_27",
+        "classeIds": [
+          "cls_6"
+        ],
+        "heures": 3,
+        "estCommun": false
+      },
+      {
+        "id": "u_96",
+        "teacherId": "t_27",
+        "classeIds": [
+          "cls_7"
+        ],
+        "heures": 3,
+        "estCommun": false
+      },
+      {
+        "id": "u_97",
+        "teacherId": "t_27",
+        "classeIds": [
+          "cls_8",
+          "cls_9"
+        ],
+        "heures": 2,
+        "estCommun": true
+      },
+      {
+        "id": "u_98",
+        "teacherId": "t_27",
+        "classeIds": [
+          "cls_10"
+        ],
+        "heures": 3,
+        "estCommun": false
+      },
+      {
+        "id": "u_99",
+        "teacherId": "t_27",
+        "classeIds": [
+          "cls_11"
+        ],
+        "heures": 3,
+        "estCommun": false
+      },
+      {
+        "id": "u_100",
+        "teacherId": "t_28",
+        "classeIds": [
+          "cls_0"
+        ],
+        "heures": 2,
+        "estCommun": false
+      },
+      {
+        "id": "u_101",
+        "teacherId": "t_28",
+        "classeIds": [
+          "cls_1"
+        ],
+        "heures": 2,
+        "estCommun": false
+      },
+      {
+        "id": "u_102",
+        "teacherId": "t_28",
+        "classeIds": [
+          "cls_2"
+        ],
+        "heures": 1,
+        "estCommun": false
+      },
+      {
+        "id": "u_103",
+        "teacherId": "t_28",
+        "classeIds": [
+          "cls_3"
+        ],
+        "heures": 1,
+        "estCommun": false
+      },
+      {
+        "id": "u_104",
+        "teacherId": "t_28",
+        "classeIds": [
+          "cls_4"
+        ],
+        "heures": 1,
+        "estCommun": false
+      },
+      {
+        "id": "u_105",
+        "teacherId": "t_28",
+        "classeIds": [
+          "cls_5"
+        ],
+        "heures": 1,
+        "estCommun": false
+      },
+      {
+        "id": "u_106",
+        "teacherId": "t_28",
+        "classeIds": [
+          "cls_6"
+        ],
+        "heures": 1,
+        "estCommun": false
+      },
+      {
+        "id": "u_107",
+        "teacherId": "t_28",
+        "classeIds": [
+          "cls_7"
+        ],
+        "heures": 1,
+        "estCommun": false
+      },
+      {
+        "id": "u_108",
+        "teacherId": "t_28",
+        "classeIds": [
+          "cls_8",
+          "cls_9"
+        ],
+        "heures": 1,
+        "estCommun": true
+      },
+      {
+        "id": "u_109",
+        "teacherId": "t_28",
+        "classeIds": [
+          "cls_10",
+          "cls_11"
+        ],
+        "heures": 1,
+        "estCommun": true
+      }
+    ],
+    "report": {
+      "fileName": "Emploi_du_Temps_Reference_360h.xlsx",
+      "importedAt": "2026-10-13T17:14:48.460Z",
+      "totalTeachers": 28,
+      "totalClasses": 12,
+      "totalUnites": 110,
+      "totalHeures": 360,
+      "totalCreneauxSemaine": 32,
+      "teacherStats": [],
+      "classeStats": [],
+      "avertissements": [],
+      "isValid": true
+    }
+  },
+  "planning": [
+    {
+      "uniteId": "u_0",
+      "slot": 10
+    },
+    {
+      "uniteId": "u_0",
+      "slot": 11
+    },
+    {
+      "uniteId": "u_0",
+      "slot": 19
+    },
+    {
+      "uniteId": "u_0",
+      "slot": 20
+    },
+    {
+      "uniteId": "u_0",
+      "slot": 26
+    },
+    {
+      "uniteId": "u_1",
+      "slot": 2
+    },
+    {
+      "uniteId": "u_1",
+      "slot": 13
+    },
+    {
+      "uniteId": "u_1",
+      "slot": 14
+    },
+    {
+      "uniteId": "u_1",
+      "slot": 24
+    },
+    {
+      "uniteId": "u_1",
+      "slot": 25
+    },
+    {
+      "uniteId": "u_2",
+      "slot": 7
+    },
+    {
+      "uniteId": "u_2",
+      "slot": 8
+    },
+    {
+      "uniteId": "u_2",
+      "slot": 17
+    },
+    {
+      "uniteId": "u_2",
+      "slot": 21
+    },
+    {
+      "uniteId": "u_2",
+      "slot": 22
+    },
+    {
+      "uniteId": "u_3",
+      "slot": 2
+    },
+    {
+      "uniteId": "u_3",
+      "slot": 15
+    },
+    {
+      "uniteId": "u_3",
+      "slot": 16
+    },
+    {
+      "uniteId": "u_3",
+      "slot": 24
+    },
+    {
+      "uniteId": "u_3",
+      "slot": 29
+    },
+    {
+      "uniteId": "u_4",
+      "slot": 3
+    },
+    {
+      "uniteId": "u_4",
+      "slot": 12
+    },
+    {
+      "uniteId": "u_4",
+      "slot": 13
+    },
+    {
+      "uniteId": "u_4",
+      "slot": 17
+    },
+    {
+      "uniteId": "u_4",
+      "slot": 26
+    },
+    {
+      "uniteId": "u_5",
+      "slot": 4
+    },
+    {
+      "uniteId": "u_5",
+      "slot": 10
+    },
+    {
+      "uniteId": "u_5",
+      "slot": 11
+    },
+    {
+      "uniteId": "u_5",
+      "slot": 14
+    },
+    {
+      "uniteId": "u_5",
+      "slot": 25
+    },
+    {
+      "uniteId": "u_6",
+      "slot": 3
+    },
+    {
+      "uniteId": "u_6",
+      "slot": 7
+    },
+    {
+      "uniteId": "u_6",
+      "slot": 18
+    },
+    {
+      "uniteId": "u_6",
+      "slot": 22
+    },
+    {
+      "uniteId": "u_6",
+      "slot": 29
+    },
+    {
+      "uniteId": "u_7",
+      "slot": 4
+    },
+    {
+      "uniteId": "u_7",
+      "slot": 11
+    },
+    {
+      "uniteId": "u_7",
+      "slot": 14
+    },
+    {
+      "uniteId": "u_7",
+      "slot": 27
+    },
+    {
+      "uniteId": "u_7",
+      "slot": 30
+    },
+    {
+      "uniteId": "u_8",
+      "slot": 2
+    },
+    {
+      "uniteId": "u_8",
+      "slot": 8
+    },
+    {
+      "uniteId": "u_8",
+      "slot": 9
+    },
+    {
+      "uniteId": "u_8",
+      "slot": 17
+    },
+    {
+      "uniteId": "u_8",
+      "slot": 24
+    },
+    {
+      "uniteId": "u_9",
+      "slot": 3
+    },
+    {
+      "uniteId": "u_9",
+      "slot": 12
+    },
+    {
+      "uniteId": "u_9",
+      "slot": 16
+    },
+    {
+      "uniteId": "u_9",
+      "slot": 17
+    },
+    {
+      "uniteId": "u_9",
+      "slot": 24
+    },
+    {
+      "uniteId": "u_10",
+      "slot": 4
+    },
+    {
+      "uniteId": "u_10",
+      "slot": 5
+    },
+    {
+      "uniteId": "u_10",
+      "slot": 14
+    },
+    {
+      "uniteId": "u_10",
+      "slot": 21
+    },
+    {
+      "uniteId": "u_10",
+      "slot": 22
+    },
+    {
+      "uniteId": "u_11",
+      "slot": 1
+    },
+    {
+      "uniteId": "u_11",
+      "slot": 2
+    },
+    {
+      "uniteId": "u_11",
+      "slot": 18
+    },
+    {
+      "uniteId": "u_11",
+      "slot": 19
+    },
+    {
+      "uniteId": "u_11",
+      "slot": 23
+    },
+    {
+      "uniteId": "u_12",
+      "slot": 1
+    },
+    {
+      "uniteId": "u_12",
+      "slot": 7
+    },
+    {
+      "uniteId": "u_12",
+      "slot": 28
+    },
+    {
+      "uniteId": "u_13",
+      "slot": 12
+    },
+    {
+      "uniteId": "u_13",
+      "slot": 23
+    },
+    {
+      "uniteId": "u_13",
+      "slot": 31
+    },
+    {
+      "uniteId": "u_14",
+      "slot": 2
+    },
+    {
+      "uniteId": "u_14",
+      "slot": 9
+    },
+    {
+      "uniteId": "u_14",
+      "slot": 27
+    },
+    {
+      "uniteId": "u_15",
+      "slot": 6
+    },
+    {
+      "uniteId": "u_15",
+      "slot": 11
+    },
+    {
+      "uniteId": "u_15",
+      "slot": 30
+    },
+    {
+      "uniteId": "u_16",
+      "slot": 19
+    },
+    {
+      "uniteId": "u_16",
+      "slot": 20
+    },
+    {
+      "uniteId": "u_16",
+      "slot": 24
+    },
+    {
+      "uniteId": "u_16",
+      "slot": 31
+    },
+    {
+      "uniteId": "u_17",
+      "slot": 17
+    },
+    {
+      "uniteId": "u_17",
+      "slot": 23
+    },
+    {
+      "uniteId": "u_17",
+      "slot": 29
+    },
+    {
+      "uniteId": "u_17",
+      "slot": 30
+    },
+    {
+      "uniteId": "u_18",
+      "slot": 1
+    },
+    {
+      "uniteId": "u_18",
+      "slot": 15
+    },
+    {
+      "uniteId": "u_18",
+      "slot": 27
+    },
+    {
+      "uniteId": "u_19",
+      "slot": 6
+    },
+    {
+      "uniteId": "u_19",
+      "slot": 12
+    },
+    {
+      "uniteId": "u_19",
+      "slot": 13
+    },
+    {
+      "uniteId": "u_19",
+      "slot": 25
+    },
+    {
+      "uniteId": "u_20",
+      "slot": 5
+    },
+    {
+      "uniteId": "u_20",
+      "slot": 6
+    },
+    {
+      "uniteId": "u_20",
+      "slot": 11
+    },
+    {
+      "uniteId": "u_20",
+      "slot": 27
+    },
+    {
+      "uniteId": "u_21",
+      "slot": 13
+    },
+    {
+      "uniteId": "u_21",
+      "slot": 18
+    },
+    {
+      "uniteId": "u_21",
+      "slot": 19
+    },
+    {
+      "uniteId": "u_21",
+      "slot": 21
+    },
+    {
+      "uniteId": "u_22",
+      "slot": 2
+    },
+    {
+      "uniteId": "u_22",
+      "slot": 7
+    },
+    {
+      "uniteId": "u_22",
+      "slot": 12
+    },
+    {
+      "uniteId": "u_22",
+      "slot": 15
+    },
+    {
+      "uniteId": "u_22",
+      "slot": 26
+    },
+    {
+      "uniteId": "u_23",
+      "slot": 4
+    },
+    {
+      "uniteId": "u_23",
+      "slot": 8
+    },
+    {
+      "uniteId": "u_23",
+      "slot": 16
+    },
+    {
+      "uniteId": "u_23",
+      "slot": 17
+    },
+    {
+      "uniteId": "u_23",
+      "slot": 22
+    },
+    {
+      "uniteId": "u_24",
+      "slot": 13
+    },
+    {
+      "uniteId": "u_24",
+      "slot": 14
+    },
+    {
+      "uniteId": "u_25",
+      "slot": 3
+    },
+    {
+      "uniteId": "u_25",
+      "slot": 4
+    },
+    {
+      "uniteId": "u_25",
+      "slot": 28
+    },
+    {
+      "uniteId": "u_26",
+      "slot": 5
+    },
+    {
+      "uniteId": "u_26",
+      "slot": 23
+    },
+    {
+      "uniteId": "u_26",
+      "slot": 30
+    },
+    {
+      "uniteId": "u_27",
+      "slot": 7
+    },
+    {
+      "uniteId": "u_27",
+      "slot": 17
+    },
+    {
+      "uniteId": "u_27",
+      "slot": 21
+    },
+    {
+      "uniteId": "u_28",
+      "slot": 1
+    },
+    {
+      "uniteId": "u_28",
+      "slot": 21
+    },
+    {
+      "uniteId": "u_29",
+      "slot": 9
+    },
+    {
+      "uniteId": "u_29",
+      "slot": 26
+    },
+    {
+      "uniteId": "u_29",
+      "slot": 28
+    },
+    {
+      "uniteId": "u_30",
+      "slot": 6
+    },
+    {
+      "uniteId": "u_30",
+      "slot": 10
+    },
+    {
+      "uniteId": "u_30",
+      "slot": 20
+    },
+    {
+      "uniteId": "u_31",
+      "slot": 3
+    },
+    {
+      "uniteId": "u_31",
+      "slot": 8
+    },
+    {
+      "uniteId": "u_31",
+      "slot": 23
+    },
+    {
+      "uniteId": "u_32",
+      "slot": 4
+    },
+    {
+      "uniteId": "u_32",
+      "slot": 12
+    },
+    {
+      "uniteId": "u_32",
+      "slot": 13
+    },
+    {
+      "uniteId": "u_32",
+      "slot": 21
+    },
+    {
+      "uniteId": "u_33",
+      "slot": 9
+    },
+    {
+      "uniteId": "u_33",
+      "slot": 10
+    },
+    {
+      "uniteId": "u_33",
+      "slot": 14
+    },
+    {
+      "uniteId": "u_33",
+      "slot": 15
+    },
+    {
+      "uniteId": "u_34",
+      "slot": 3
+    },
+    {
+      "uniteId": "u_34",
+      "slot": 11
+    },
+    {
+      "uniteId": "u_34",
+      "slot": 18
+    },
+    {
+      "uniteId": "u_34",
+      "slot": 25
+    },
+    {
+      "uniteId": "u_35",
+      "slot": 5
+    },
+    {
+      "uniteId": "u_35",
+      "slot": 6
+    },
+    {
+      "uniteId": "u_35",
+      "slot": 7
+    },
+    {
+      "uniteId": "u_35",
+      "slot": 20
+    },
+    {
+      "uniteId": "u_36",
+      "slot": 2
+    },
+    {
+      "uniteId": "u_36",
+      "slot": 3
+    },
+    {
+      "uniteId": "u_36",
+      "slot": 17
+    },
+    {
+      "uniteId": "u_36",
+      "slot": 23
+    },
+    {
+      "uniteId": "u_36",
+      "slot": 31
+    },
+    {
+      "uniteId": "u_37",
+      "slot": 5
+    },
+    {
+      "uniteId": "u_37",
+      "slot": 6
+    },
+    {
+      "uniteId": "u_37",
+      "slot": 16
+    },
+    {
+      "uniteId": "u_37",
+      "slot": 27
+    },
+    {
+      "uniteId": "u_37",
+      "slot": 30
+    },
+    {
+      "uniteId": "u_38",
+      "slot": 4
+    },
+    {
+      "uniteId": "u_38",
+      "slot": 15
+    },
+    {
+      "uniteId": "u_38",
+      "slot": 25
+    },
+    {
+      "uniteId": "u_38",
+      "slot": 28
+    },
+    {
+      "uniteId": "u_38",
+      "slot": 29
+    },
+    {
+      "uniteId": "u_39",
+      "slot": 3
+    },
+    {
+      "uniteId": "u_39",
+      "slot": 8
+    },
+    {
+      "uniteId": "u_39",
+      "slot": 9
+    },
+    {
+      "uniteId": "u_39",
+      "slot": 10
+    },
+    {
+      "uniteId": "u_39",
+      "slot": 28
+    },
+    {
+      "uniteId": "u_40",
+      "slot": 4
+    },
+    {
+      "uniteId": "u_40",
+      "slot": 11
+    },
+    {
+      "uniteId": "u_40",
+      "slot": 18
+    },
+    {
+      "uniteId": "u_40",
+      "slot": 22
+    },
+    {
+      "uniteId": "u_40",
+      "slot": 23
+    },
+    {
+      "uniteId": "u_41",
+      "slot": 5
+    },
+    {
+      "uniteId": "u_41",
+      "slot": 12
+    },
+    {
+      "uniteId": "u_41",
+      "slot": 19
+    },
+    {
+      "uniteId": "u_41",
+      "slot": 20
+    },
+    {
+      "uniteId": "u_41",
+      "slot": 27
+    },
+    {
+      "uniteId": "u_42",
+      "slot": 2
+    },
+    {
+      "uniteId": "u_42",
+      "slot": 14
+    },
+    {
+      "uniteId": "u_42",
+      "slot": 25
+    },
+    {
+      "uniteId": "u_42",
+      "slot": 26
+    },
+    {
+      "uniteId": "u_43",
+      "slot": 5
+    },
+    {
+      "uniteId": "u_43",
+      "slot": 7
+    },
+    {
+      "uniteId": "u_43",
+      "slot": 20
+    },
+    {
+      "uniteId": "u_43",
+      "slot": 24
+    },
+    {
+      "uniteId": "u_44",
+      "slot": 3
+    },
+    {
+      "uniteId": "u_44",
+      "slot": 19
+    },
+    {
+      "uniteId": "u_44",
+      "slot": 22
+    },
+    {
+      "uniteId": "u_44",
+      "slot": 23
+    },
+    {
+      "uniteId": "u_45",
+      "slot": 4
+    },
+    {
+      "uniteId": "u_45",
+      "slot": 7
+    },
+    {
+      "uniteId": "u_45",
+      "slot": 22
+    },
+    {
+      "uniteId": "u_45",
+      "slot": 23
+    },
+    {
+      "uniteId": "u_46",
+      "slot": 16
+    },
+    {
+      "uniteId": "u_46",
+      "slot": 17
+    },
+    {
+      "uniteId": "u_46",
+      "slot": 27
+    },
+    {
+      "uniteId": "u_46",
+      "slot": 29
+    },
+    {
+      "uniteId": "u_47",
+      "slot": 3
+    },
+    {
+      "uniteId": "u_47",
+      "slot": 10
+    },
+    {
+      "uniteId": "u_47",
+      "slot": 26
+    },
+    {
+      "uniteId": "u_47",
+      "slot": 28
+    },
+    {
+      "uniteId": "u_48",
+      "slot": 21
+    },
+    {
+      "uniteId": "u_48",
+      "slot": 22
+    },
+    {
+      "uniteId": "u_48",
+      "slot": 29
+    },
+    {
+      "uniteId": "u_48",
+      "slot": 30
+    },
+    {
+      "uniteId": "u_49",
+      "slot": 10
+    },
+    {
+      "uniteId": "u_49",
+      "slot": 11
+    },
+    {
+      "uniteId": "u_49",
+      "slot": 17
+    },
+    {
+      "uniteId": "u_49",
+      "slot": 18
+    },
+    {
+      "uniteId": "u_50",
+      "slot": 1
+    },
+    {
+      "uniteId": "u_50",
+      "slot": 12
+    },
+    {
+      "uniteId": "u_50",
+      "slot": 13
+    },
+    {
+      "uniteId": "u_51",
+      "slot": 1
+    },
+    {
+      "uniteId": "u_51",
+      "slot": 12
+    },
+    {
+      "uniteId": "u_51",
+      "slot": 13
+    },
+    {
+      "uniteId": "u_52",
+      "slot": 5
+    },
+    {
+      "uniteId": "u_52",
+      "slot": 6
+    },
+    {
+      "uniteId": "u_52",
+      "slot": 14
+    },
+    {
+      "uniteId": "u_52",
+      "slot": 15
+    },
+    {
+      "uniteId": "u_53",
+      "slot": 7
+    },
+    {
+      "uniteId": "u_53",
+      "slot": 8
+    },
+    {
+      "uniteId": "u_53",
+      "slot": 21
+    },
+    {
+      "uniteId": "u_53",
+      "slot": 22
+    },
+    {
+      "uniteId": "u_54",
+      "slot": 8
+    },
+    {
+      "uniteId": "u_54",
+      "slot": 9
+    },
+    {
+      "uniteId": "u_54",
+      "slot": 17
+    },
+    {
+      "uniteId": "u_55",
+      "slot": 16
+    },
+    {
+      "uniteId": "u_55",
+      "slot": 28
+    },
+    {
+      "uniteId": "u_55",
+      "slot": 29
+    },
+    {
+      "uniteId": "u_56",
+      "slot": 14
+    },
+    {
+      "uniteId": "u_56",
+      "slot": 30
+    },
+    {
+      "uniteId": "u_56",
+      "slot": 31
+    },
+    {
+      "uniteId": "u_57",
+      "slot": 27
+    },
+    {
+      "uniteId": "u_57",
+      "slot": 29
+    },
+    {
+      "uniteId": "u_57",
+      "slot": 30
+    },
+    {
+      "uniteId": "u_58",
+      "slot": 1
+    },
+    {
+      "uniteId": "u_58",
+      "slot": 10
+    },
+    {
+      "uniteId": "u_59",
+      "slot": 24
+    },
+    {
+      "uniteId": "u_59",
+      "slot": 25
+    },
+    {
+      "uniteId": "u_59",
+      "slot": 31
+    },
+    {
+      "uniteId": "u_60",
+      "slot": 9
+    },
+    {
+      "uniteId": "u_60",
+      "slot": 15
+    },
+    {
+      "uniteId": "u_60",
+      "slot": 16
+    },
+    {
+      "uniteId": "u_61",
+      "slot": 7
+    },
+    {
+      "uniteId": "u_61",
+      "slot": 8
+    },
+    {
+      "uniteId": "u_61",
+      "slot": 26
+    },
+    {
+      "uniteId": "u_62",
+      "slot": 10
+    },
+    {
+      "uniteId": "u_62",
+      "slot": 11
+    },
+    {
+      "uniteId": "u_62",
+      "slot": 20
+    },
+    {
+      "uniteId": "u_63",
+      "slot": 4
+    },
+    {
+      "uniteId": "u_63",
+      "slot": 5
+    },
+    {
+      "uniteId": "u_63",
+      "slot": 18
+    },
+    {
+      "uniteId": "u_64",
+      "slot": 9
+    },
+    {
+      "uniteId": "u_64",
+      "slot": 28
+    },
+    {
+      "uniteId": "u_64",
+      "slot": 29
+    },
+    {
+      "uniteId": "u_65",
+      "slot": 15
+    },
+    {
+      "uniteId": "u_65",
+      "slot": 16
+    },
+    {
+      "uniteId": "u_65",
+      "slot": 31
+    },
+    {
+      "uniteId": "u_66",
+      "slot": 23
+    },
+    {
+      "uniteId": "u_66",
+      "slot": 24
+    },
+    {
+      "uniteId": "u_66",
+      "slot": 30
+    },
+    {
+      "uniteId": "u_67",
+      "slot": 2
+    },
+    {
+      "uniteId": "u_67",
+      "slot": 21
+    },
+    {
+      "uniteId": "u_67",
+      "slot": 22
+    },
+    {
+      "uniteId": "u_68",
+      "slot": 10
+    },
+    {
+      "uniteId": "u_68",
+      "slot": 15
+    },
+    {
+      "uniteId": "u_68",
+      "slot": 16
+    },
+    {
+      "uniteId": "u_69",
+      "slot": 5
+    },
+    {
+      "uniteId": "u_69",
+      "slot": 6
+    },
+    {
+      "uniteId": "u_69",
+      "slot": 11
+    },
+    {
+      "uniteId": "u_70",
+      "slot": 13
+    },
+    {
+      "uniteId": "u_70",
+      "slot": 19
+    },
+    {
+      "uniteId": "u_70",
+      "slot": 20
+    },
+    {
+      "uniteId": "u_71",
+      "slot": 27
+    },
+    {
+      "uniteId": "u_71",
+      "slot": 29
+    },
+    {
+      "uniteId": "u_71",
+      "slot": 30
+    },
+    {
+      "uniteId": "u_72",
+      "slot": 5
+    },
+    {
+      "uniteId": "u_72",
+      "slot": 8
+    },
+    {
+      "uniteId": "u_72",
+      "slot": 27
+    },
+    {
+      "uniteId": "u_73",
+      "slot": 9
+    },
+    {
+      "uniteId": "u_73",
+      "slot": 21
+    },
+    {
+      "uniteId": "u_73",
+      "slot": 22
+    },
+    {
+      "uniteId": "u_74",
+      "slot": 3
+    },
+    {
+      "uniteId": "u_74",
+      "slot": 16
+    },
+    {
+      "uniteId": "u_74",
+      "slot": 24
+    },
+    {
+      "uniteId": "u_75",
+      "slot": 19
+    },
+    {
+      "uniteId": "u_75",
+      "slot": 20
+    },
+    {
+      "uniteId": "u_75",
+      "slot": 26
+    },
+    {
+      "uniteId": "u_76",
+      "slot": 7
+    },
+    {
+      "uniteId": "u_76",
+      "slot": 8
+    },
+    {
+      "uniteId": "u_76",
+      "slot": 30
+    },
+    {
+      "uniteId": "u_77",
+      "slot": 1
+    },
+    {
+      "uniteId": "u_77",
+      "slot": 2
+    },
+    {
+      "uniteId": "u_77",
+      "slot": 24
+    },
+    {
+      "uniteId": "u_78",
+      "slot": 5
+    },
+    {
+      "uniteId": "u_78",
+      "slot": 16
+    },
+    {
+      "uniteId": "u_78",
+      "slot": 28
+    },
+    {
+      "uniteId": "u_79",
+      "slot": 10
+    },
+    {
+      "uniteId": "u_79",
+      "slot": 15
+    },
+    {
+      "uniteId": "u_80",
+      "slot": 7
+    },
+    {
+      "uniteId": "u_80",
+      "slot": 18
+    },
+    {
+      "uniteId": "u_80",
+      "slot": 29
+    },
+    {
+      "uniteId": "u_81",
+      "slot": 2
+    },
+    {
+      "uniteId": "u_81",
+      "slot": 8
+    },
+    {
+      "uniteId": "u_81",
+      "slot": 28
+    },
+    {
+      "uniteId": "u_82",
+      "slot": 6
+    },
+    {
+      "uniteId": "u_82",
+      "slot": 31
+    },
+    {
+      "uniteId": "u_83",
+      "slot": 12
+    },
+    {
+      "uniteId": "u_83",
+      "slot": 14
+    },
+    {
+      "uniteId": "u_84",
+      "slot": 6
+    },
+    {
+      "uniteId": "u_84",
+      "slot": 24
+    },
+    {
+      "uniteId": "u_85",
+      "slot": 15
+    },
+    {
+      "uniteId": "u_86",
+      "slot": 19
+    },
+    {
+      "uniteId": "u_86",
+      "slot": 26
+    },
+    {
+      "uniteId": "u_87",
+      "slot": 14
+    },
+    {
+      "uniteId": "u_87",
+      "slot": 23
+    },
+    {
+      "uniteId": "u_88",
+      "slot": 16
+    },
+    {
+      "uniteId": "u_88",
+      "slot": 27
+    },
+    {
+      "uniteId": "u_89",
+      "slot": 3
+    },
+    {
+      "uniteId": "u_89",
+      "slot": 18
+    },
+    {
+      "uniteId": "u_90",
+      "slot": 12
+    },
+    {
+      "uniteId": "u_90",
+      "slot": 21
+    },
+    {
+      "uniteId": "u_91",
+      "slot": 9
+    },
+    {
+      "uniteId": "u_91",
+      "slot": 26
+    },
+    {
+      "uniteId": "u_92",
+      "slot": 1
+    },
+    {
+      "uniteId": "u_92",
+      "slot": 25
+    },
+    {
+      "uniteId": "u_93",
+      "slot": 8
+    },
+    {
+      "uniteId": "u_93",
+      "slot": 30
+    },
+    {
+      "uniteId": "u_94",
+      "slot": 13
+    },
+    {
+      "uniteId": "u_95",
+      "slot": 4
+    },
+    {
+      "uniteId": "u_95",
+      "slot": 13
+    },
+    {
+      "uniteId": "u_95",
+      "slot": 19
+    },
+    {
+      "uniteId": "u_96",
+      "slot": 1
+    },
+    {
+      "uniteId": "u_96",
+      "slot": 18
+    },
+    {
+      "uniteId": "u_96",
+      "slot": 31
+    },
+    {
+      "uniteId": "u_97",
+      "slot": 20
+    },
+    {
+      "uniteId": "u_97",
+      "slot": 26
+    },
+    {
+      "uniteId": "u_98",
+      "slot": 23
+    },
+    {
+      "uniteId": "u_98",
+      "slot": 24
+    },
+    {
+      "uniteId": "u_98",
+      "slot": 28
+    },
+    {
+      "uniteId": "u_99",
+      "slot": 11
+    },
+    {
+      "uniteId": "u_99",
+      "slot": 15
+    },
+    {
+      "uniteId": "u_99",
+      "slot": 21
+    },
+    {
+      "uniteId": "u_100",
+      "slot": 12
+    },
+    {
+      "uniteId": "u_100",
+      "slot": 25
+    },
+    {
+      "uniteId": "u_101",
+      "slot": 1
+    },
+    {
+      "uniteId": "u_101",
+      "slot": 19
+    },
+    {
+      "uniteId": "u_102",
+      "slot": 18
+    },
+    {
+      "uniteId": "u_103",
+      "slot": 27
+    },
+    {
+      "uniteId": "u_104",
+      "slot": 2
+    },
+    {
+      "uniteId": "u_105",
+      "slot": 6
+    },
+    {
+      "uniteId": "u_106",
+      "slot": 11
+    },
+    {
+      "uniteId": "u_107",
+      "slot": 17
+    },
+    {
+      "uniteId": "u_109",
+      "slot": 9
+    },
+    {
+      "uniteId": "u_18",
+      "slot": 0
+    },
+    {
+      "uniteId": "u_24",
+      "slot": 0
+    },
+    {
+      "uniteId": "u_28",
+      "slot": 0
+    },
+    {
+      "uniteId": "u_50",
+      "slot": 0
+    },
+    {
+      "uniteId": "u_51",
+      "slot": 0
+    },
+    {
+      "uniteId": "u_58",
+      "slot": 0
+    },
+    {
+      "uniteId": "u_79",
+      "slot": 0
+    },
+    {
+      "uniteId": "u_85",
+      "slot": 0
+    },
+    {
+      "uniteId": "u_94",
+      "slot": 0
+    },
+    {
+      "uniteId": "u_108",
+      "slot": 0
+    }
+  ]
+}

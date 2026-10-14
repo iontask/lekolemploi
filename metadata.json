@@ -1,0 +1,6 @@
+{
+  "name": "Générateur d'emplois du temps",
+  "description": "Application de génération et gestion d'emplois du temps scolaires : import Excel, modèle de données, contrôle des disponibilités et contraintes.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
