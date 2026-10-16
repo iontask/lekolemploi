@@ -485,9 +485,9 @@ export function getUnassignedSessionsForEntity(
   planning: Planning,
   contextEntity: { type: 'class' | 'teacher'; id: string }
 ): UnassignedSessionItem[] {
-  const { unites, teachers, classes } = data;
-  const teacherMap = new Map<string, Teacher>(teachers.map((t) => [t.id, t]));
-  const classMap = new Map<string, Classe>(classes.map((c) => [c.id, c]));
+  const { unites = [], teachers = [], classes = [] } = data || {};
+  const teacherMap = new Map<string, Teacher>((teachers || []).map((t) => [t.id, t]));
+  const classMap = new Map<string, Classe>((classes || []).map((c) => [c.id, c]));
 
   // Filtrer les unités concernées par l'entité
   const relevantUnites = unites.filter((u) => {

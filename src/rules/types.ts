@@ -34,6 +34,7 @@ export type ViolationType =
   | 'BLOC_EXCES_JOUR'
   | 'BLOC_NON_CONSECUTIF'
   | 'BLOC_HEURE_ISOLEE_INVALIDE'
+  | 'BLOC_REPARTITION_NON_CONFORME'
   | 'CRENEAU_RESERVE_VIOLATION'
   | 'PLAGE_INTERDITE_CLASSE'
   | 'PLAGE_INTERDITE_PROF'
@@ -71,6 +72,16 @@ export interface ForbiddenSlotPerTeacher {
   reason?: string;
 }
 
+export interface SubjectLevelBlockRule {
+  id: string;
+  matiere: string; // Ex: 'Mathématiques', 'Physique-Chimie', ou '*' (Toutes)
+  niveau: string; // Ex: '2BAC', '1BAC', 'TCSF', '3APIC', '2APIC', '1APIC', ou '*' (Tous)
+  heuresHebdo: number; // Volume horaire hebdomadaire (ex: 7)
+  possibilites: number[][]; // Ex: [[2, 2, 2, 1], [3, 3, 1], [3, 2, 2]] (chacun max 3h)
+  description?: string;
+  actif?: boolean;
+}
+
 export interface RulesOptions {
   /** Règle générale des blocs de 2h consécutives applicable à toutes les matières (défaut true) */
   toutesMatieresABlocs?: boolean;
@@ -102,6 +113,12 @@ export interface RulesOptions {
   forbiddenSlotsClasses?: ForbiddenSlotPerClass[];
   /** Plages interdites par prof */
   forbiddenSlotsTeachers?: ForbiddenSlotPerTeacher[];
+  /** Configuration des possibilités de blocs par matière / niveau (ex: 7h = 2h+2h+2h+1h ou 3h+3h+1h ou 3h+2h+2h, max 3h) */
+  subjectBlockRules?: SubjectLevelBlockRule[];
+  /** Limite maximale d'heures par jour/séance par matière (1h, 2h ou 3h) */
+  maxHeuresParJourParMatiere?: Record<string, 1 | 2 | 3>;
+  /** Mode relâché : règles souples assouplies en cas d'infaisabilité */
+  relaxedMode?: boolean;
 }
 
 export interface ScoreBreakdown {

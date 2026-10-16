@@ -35,7 +35,10 @@ export const RulesInspector: React.FC<RulesInspectorProps> = ({ dataset }) => {
   const [selectedUniteId, setSelectedUniteId] = useState<string>(unites[0]?.id || '');
   const [testSlot, setTestSlot] = useState<number>(0);
   const [currentPlanning, setCurrentPlanning] = useState<Planning>([]);
-  const [options, setOptions] = useState<RulesOptions>(DEFAULT_RULES_OPTIONS);
+  const [options, setOptions] = useState<RulesOptions>(() => ({
+    ...DEFAULT_RULES_OPTIONS,
+    ...(dataset.constraints || {}),
+  }));
 
   const selectedUnite = unites.find((u) => u.id === selectedUniteId) || unites[0];
   const selectedTeacher = teachers.find((t) => t.id === selectedUnite?.teacherId);

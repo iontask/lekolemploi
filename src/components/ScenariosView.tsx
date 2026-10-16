@@ -87,17 +87,16 @@ export const ScenariosView: React.FC<ScenariosViewProps> = ({
   // Modification dans le scénario actif
   const [selectedTeacherId, setSelectedTeacherId] = useState<string>(teachers[0]?.id || '');
 
+  // État de suppression de scénario
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
   // Cloner le planning actuel
   const handleCloneCurrent = () => {
-    const newName = window.prompt(
-      'Nom du nouveau scénario :',
-      `Scénario ${String.fromCharCode(65 + scenarios.length)} (Copie)`
-    );
-    if (!newName) return;
+    const defaultName = `Scénario ${String.fromCharCode(65 + scenarios.length)}`;
 
     const cloned: ScheduleScenario = {
       id: `scenario_${Date.now()}`,
-      name: newName,
+      name: defaultName,
       description: 'Clone du planning pour simulation d\'hypothèses (What-If).',
       createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       dataset: JSON.parse(JSON.stringify(dataset)),
@@ -114,16 +113,14 @@ export const ScenariosView: React.FC<ScenariosViewProps> = ({
   };
 
   const handleDeleteScenario = (id: string) => {
-    if (scenarios.length <= 1) {
-      alert('Vous devez conserver au moins un scénario.');
-      return;
-    }
-    if (window.confirm('Supprimer définitivement ce scénario ?')) {
-      const nextList = scenarios.filter((s) => s.id !== id);
-      setScenarios(nextList);
+    if (scenarios.length <= 1) return;
+    const nextList = scenarios.filter((s) => s.id !== id);
+    setScenarios(nextList);
+    setConfirmDeleteId(null);
+    if (activeScenarioId === id && nextList[0]) {
       setActiveScenarioId(nextList[0].id);
-      onUpdateDatasetScenarios(nextList);
     }
+    onUpdateDatasetScenarios(nextList);
   };
 
   // Modifier la charge d'un prof dans le scénario actif
@@ -285,17 +282,45 @@ export const ScenariosView: React.FC<ScenariosViewProps> = ({
               </span>
             )}
             {scenarios.length > 1 && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDeleteScenario(sc.id);
-                }}
-                className="hover:text-rose-600 text-slate-400 p-0.5"
-                title="Supprimer le scénario"
-              >
-                <Trash2 className="w-3 h-3" />
-              </button>
+              confirmDeleteId === sc.id ? (
+                <div
+                  className="flex items-center gap-1 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteScenario(sc.id);
+                    }}
+                    className="text-[10px] font-bold text-rose-600 hover:text-rose-800"
+                  >
+                    Supprimer ?
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setConfirmDeleteId(null);
+                    }}
+                    className="text-[10px] text-slate-500 hover:text-slate-700"
+                  >
+                    ×
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setConfirmDeleteId(sc.id);
+                  }}
+                  className="hover:text-rose-600 text-slate-400 p-0.5"
+                  title="Supprimer le scénario"
+                >
+                  <Trash2 className="w-3 h-3" />
+                </button>
+              )
             )}
           </div>
         ))}

@@ -43,6 +43,12 @@ export interface SolverConfig {
   forbiddenSlotsTeachers?: import('../rules/types').ForbiddenSlotPerTeacher[];
   /** Préférer des blocs de 2h consécutives pour toute matière > 2h (défaut : true) */
   prefererBlocs2hMemeJour?: boolean;
+  /** Configuration des possibilités de blocs par matière / niveau */
+  subjectBlockRules?: import('../rules/types').SubjectLevelBlockRule[];
+  /** Limite maximale d'heures par jour/séance par matière (1h, 2h ou 3h) */
+  maxHeuresParJourParMatiere?: Record<string, 1 | 2 | 3>;
+  /** Respecter la pause de 1h après 4h (entre C4 et C5) : aucun bloc à cheval */
+  respecterPauseMidiBlocs?: boolean;
   /** Mode relâché : règles souples assouplies en cas d'infaisabilité */
   relaxedMode?: boolean;
 }
@@ -53,6 +59,7 @@ export const DEFAULT_SOLVER_CONFIG: SolverConfig = {
   toutesMatieresABlocs: true,
   matieresABlocs: ['Arabe', 'Anglais'],
   prefererBlocs2hMemeJour: true,
+  respecterPauseMidiBlocs: true,
   maxHeuresParJourUnite: 2,
   maxHeuresParJourProf: 6,
   maxHeuresParJourClasse: 6,
@@ -64,8 +71,46 @@ export const DEFAULT_SOLVER_CONFIG: SolverConfig = {
   reservedSlots: [],
   forbiddenSlotsClasses: [],
   forbiddenSlotsTeachers: [],
+  subjectBlockRules: [],
+  maxHeuresParJourParMatiere: {},
   relaxedMode: false,
 };
+
+export type LogSeverity = 'INFO' | 'SUCCESS' | 'WARNING' | 'BOTTLENECK';
+
+export interface GenerationLogEntry {
+  id: string;
+  timestamp: number;
+  phase: 'INIT' | 'PHASE_A' | 'PHASE_B' | 'RELAX' | 'SUMMARY';
+  severity: LogSeverity;
+  message: string;
+  details?: string;
+  entityId?: string;
+  entityName?: string;
+  bottleneckType?:
+    | 'TEACHER_DISPO'
+    | 'TEACHER_MAX_HOURS'
+    | 'CLASS_COLLISION'
+    | 'BLOCK_CONSTRAINT'
+    | 'LUNCH_BREAK'
+    | 'FORBIDDEN_SLOT'
+    | 'ROOM_OR_QUOTA';
+  actionLabel?: string;
+  actionPatch?: Partial<SolverConfig>;
+}
+
+export interface GenerationBottleneck {
+  id: string;
+  matiere: string;
+  teacherNom: string;
+  classesNoms: string[];
+  missingHours: number;
+  bottleneckType: string;
+  primaryCause: string;
+  diagnosticExplanation: string;
+  suggestedSolution: string;
+  patch?: Partial<SolverConfig>;
+}
 
 export interface SolverProgress {
   phase: 'A' | 'B';
@@ -74,6 +119,7 @@ export interface SolverProgress {
   elapsedMs: number;
   currentScore?: number;
   phaseADurationMs?: number;
+  recentLogs?: GenerationLogEntry[];
 }
 
 export interface SolverResult {
@@ -93,6 +139,8 @@ export interface SolverResult {
     constraintsCount?: number;
     highsStatus?: string;
   };
+  logs?: GenerationLogEntry[];
+  bottlenecks?: GenerationBottleneck[];
   error?: string;
 }
 

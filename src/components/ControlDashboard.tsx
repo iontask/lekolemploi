@@ -155,6 +155,64 @@ export const ControlDashboard: React.FC<ControlDashboardProps> = ({
   const is12Classes = report.totalClasses === 12;
   const is360Hours = report.totalHeures === 360;
 
+  // Si l'utilisateur est sur l'emploi du temps
+  if (activeTab === 'timetable' && dataset.planning) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        <TimetableGrid
+          dataset={dataset}
+          planning={dataset.planning}
+          resultInfo={dataset.solverResult}
+          onOpenGenerator={() => onOpenGenerator()}
+          onOpenGeneratorWithLocks={onOpenGeneratorWithLocks}
+          onUpdatePlanning={onUpdatePlanning}
+        />
+      </div>
+    );
+  }
+
+  // Si l'utilisateur est sur les contraintes
+  if (activeTab === 'constraints') {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <ConstraintsPanel
+          dataset={dataset}
+          currentConstraints={dataset.constraints}
+          onSaveConstraints={(newC) => onSaveConstraints?.(newC)}
+        />
+      </div>
+    );
+  }
+
+  // Si l'utilisateur est sur le diagnostic
+  if (activeTab === 'diagnostic') {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <DiagnosticView
+          dataset={dataset}
+          constraints={dataset.constraints}
+          onOpenGenerator={(relaxed) => onOpenGenerator(relaxed)}
+          onOpenConstraintsTab={() => onSelectTab('constraints')}
+        />
+      </div>
+    );
+  }
+
+  // Si l'utilisateur est sur les scénarios
+  if (activeTab === 'scenarios') {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <ScenariosView
+          dataset={dataset}
+          currentPlanning={dataset.planning || []}
+          currentConstraints={dataset.constraints}
+          onApplyScenarioPlanning={(sc) => onApplyScenario?.(sc)}
+          onUpdateDatasetScenarios={(scs) => onUpdateScenarios?.(scs)}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
       {/* En-tête de synthèse & fichier */}
@@ -381,20 +439,8 @@ export const ControlDashboard: React.FC<ControlDashboardProps> = ({
         </button>
       </div>
 
-      {/* CONTENU ONGLET : EMPLOI DU TEMPS */}
-      {activeTab === 'timetable' && dataset.planning && (
-        <TimetableGrid
-          dataset={dataset}
-          planning={dataset.planning}
-          resultInfo={dataset.solverResult}
-          onOpenGenerator={() => onOpenGenerator()}
-          onOpenGeneratorWithLocks={onOpenGeneratorWithLocks}
-          onUpdatePlanning={onUpdatePlanning}
-        />
-      )}
-
       {/* CONTENU ONGLET 1 : ENSEIGNANTS */}
-      {((activeTab === 'teachers') || (activeTab === 'dashboard' && !dataset.planning)) && (
+      {((activeTab === 'teachers') || (activeTab === 'dashboard')) && (
         <div className="space-y-4">
           {/* Filtres et recherche */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
@@ -865,36 +911,6 @@ export const ControlDashboard: React.FC<ControlDashboardProps> = ({
             </pre>
           </div>
         </div>
-      )}
-
-      {/* CONTENU ONGLET 6 : PANNEAU DE CONTRAINTES ÉDITABLE (Étape 6.1) */}
-      {activeTab === 'constraints' && (
-        <ConstraintsPanel
-          dataset={dataset}
-          currentConstraints={dataset.constraints}
-          onSaveConstraints={(newC) => onSaveConstraints?.(newC)}
-        />
-      )}
-
-      {/* CONTENU ONGLET 7 : DIAGNOSTIC D'INFAISABILITÉ (Étape 6.2) */}
-      {activeTab === 'diagnostic' && (
-        <DiagnosticView
-          dataset={dataset}
-          constraints={dataset.constraints}
-          onOpenGenerator={(relaxed) => onOpenGenerator(relaxed)}
-          onOpenConstraintsTab={() => onSelectTab('constraints')}
-        />
-      )}
-
-      {/* CONTENU ONGLET 8 : SCÉNARIOS & COMPARATEUR WHAT-IF (Étape 6.3) */}
-      {activeTab === 'scenarios' && (
-        <ScenariosView
-          dataset={dataset}
-          currentPlanning={dataset.planning || []}
-          currentConstraints={dataset.constraints}
-          onApplyScenarioPlanning={(sc) => onApplyScenario?.(sc)}
-          onUpdateDatasetScenarios={(scs) => onUpdateScenarios?.(scs)}
-        />
       )}
     </div>
   );

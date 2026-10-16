@@ -12,6 +12,7 @@ import {
   RulesOptions,
   ScheduleData,
   ScoreBreakdown,
+  SubjectLevelBlockRule,
 } from './types';
 
 export * from './types';
@@ -32,6 +33,9 @@ export const DEFAULT_RULES_OPTIONS: Required<RulesOptions> = {
   reservedSlots: [],
   forbiddenSlotsClasses: [],
   forbiddenSlotsTeachers: [],
+  subjectBlockRules: [],
+  maxHeuresParJourParMatiere: {},
+  relaxedMode: false,
 };
 
 /** Plages horaires standard de 1h chacune (7 créneaux lundi-jeudi, 4 créneaux vendredi) */
@@ -148,6 +152,103 @@ export function areSlotsConsecutiveWithoutPause(
   }
 
   return true;
+}
+
+/**
+ * Vérifie si une liste de créneaux placés sur un même jour forme un bloc consécutif valide :
+ * - Même jour
+ * - Taille comprise entre 1 et 3h (maximum absolu 3h)
+ * - Strictement adjacents (sans trou)
+ * - Ne chevauchant pas la pause méridienne (entre C4 et C5 sur journée de 7h)
+ */
+export function areSlotsConsecutiveBlockWithoutPause(
+  slots: number[],
+  semaine: Semaine,
+  respecterPause: boolean = true
+): boolean {
+  if (slots.length <= 1) return true;
+  if (slots.length > 3) return false; // Le maximum est toujours 3h
+
+  const sorted = [...slots].sort((a, b) => a - b);
+  const coords = sorted.map((s) => getSlotCoordinates(s, semaine));
+  const firstDay = coords[0].jourIndex;
+  if (!coords.every((c) => c.jourIndex === firstDay)) return false;
+
+  for (let i = 0; i < coords.length - 1; i++) {
+    const cCurr = coords[i];
+    const cNext = coords[i + 1];
+    if (cNext.creneauNumero !== cCurr.creneauNumero + 1) return false;
+    if (respecterPause) {
+      const daySlots = semaine.creneauxParJour[firstDay];
+      if (daySlots === 7 && cCurr.creneauNumero === 4 && cNext.creneauNumero === 5) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+/**
+ * Génère toutes les possibilités de découpage en blocs d'un volume horaire hebdomadaire
+ * sous la contrainte que chaque bloc soit d'au maximum 3h (ex: pour 7h -> [3,3,1], [3,2,2], [2,2,2,1]...)
+ */
+export function generatePossibleBlockPartitions(
+  totalHours: number,
+  maxBlockSize: number = 3
+): number[][] {
+  const effectiveMax = Math.min(3, Math.max(1, maxBlockSize));
+  const results: number[][] = [];
+
+  function backtrack(rem: number, maxAllowed: number, current: number[]) {
+    if (rem === 0) {
+      results.push([...current]);
+      return;
+    }
+    const limit = Math.min(rem, maxAllowed);
+    for (let part = limit; part >= 1; part--) {
+      current.push(part);
+      backtrack(rem - part, part, current);
+      current.pop();
+    }
+  }
+
+  backtrack(totalHours, effectiveMax, []);
+  return results;
+}
+
+/**
+ * Recherche une règle de blocs personnalisée correspondant à une matière et un niveau/classe donnés
+ */
+export function findMatchingBlockRule(
+  matiere: string,
+  niveauOuClasse: string,
+  heures: number,
+  rules?: SubjectLevelBlockRule[]
+): SubjectLevelBlockRule | undefined {
+  if (!rules || rules.length === 0) return undefined;
+  const matNorm = (matiere || '').trim().toLowerCase();
+  const nivNorm = (niveauOuClasse || '').trim().toLowerCase();
+
+  return rules.find((r) => {
+    if (r.actif === false) return false;
+    if (r.heuresHebdo && r.heuresHebdo !== heures) return false;
+
+    const ruleMat = (r.matiere || '').trim().toLowerCase();
+    const matMatches =
+      ruleMat === '*' ||
+      ruleMat === 'toutes' ||
+      matNorm.includes(ruleMat) ||
+      ruleMat.includes(matNorm);
+    if (!matMatches) return false;
+
+    const ruleNiv = (r.niveau || '').trim().toLowerCase();
+    const nivMatches =
+      ruleNiv === '*' ||
+      ruleNiv === 'tous' ||
+      nivNorm.includes(ruleNiv) ||
+      ruleNiv.includes(nivNorm);
+    return nivMatches;
+  });
 }
 
 /**
@@ -413,6 +514,18 @@ export function verify(
       .map((cid) => classMap.get(cid)?.nom || cid)
       .join(' + ');
 
+    const classesNiveaux = unite.classeIds
+      .map((cid) => classMap.get(cid)?.niveau || '')
+      .filter(Boolean)
+      .join(' / ');
+
+    const matchingRule = findMatchingBlockRule(
+      prof.matiere,
+      classesNiveaux,
+      unite.heures,
+      options.subjectBlockRules
+    );
+
     // Répartition des créneaux par jour
     const slotsParJour = new Map<number, number[]>();
     for (const slot of placedSlots) {
@@ -422,74 +535,158 @@ export function verify(
       slotsParJour.set(coords.jourIndex, list);
     }
 
-    let joursAvecUneHeure = 0;
+    if (matchingRule && matchingRule.possibilites.length > 0) {
+      // --- MODÈLE CONFIGURÉ PAR MATIÈRE / NIVEAU (Possibilités de blocs, max 3h) ---
+      const maxBlockAllowed = Math.min(
+        3,
+        Math.max(1, ...matchingRule.possibilites.map((p) => Math.max(...p)))
+      );
 
-    for (const [jourIndex, slotsJour] of slotsParJour.entries()) {
-      const jourNom = data.semaine.jours[jourIndex] || `Jour ${jourIndex + 1}`;
-      slotsJour.sort((a, b) => a - b);
+      for (const [jourIndex, slotsJour] of slotsParJour.entries()) {
+        const jourNom = data.semaine.jours[jourIndex] || `Jour ${jourIndex + 1}`;
+        slotsJour.sort((a, b) => a - b);
 
-      // (5.A) Jamais plus de 2h par jour
-      if (slotsJour.length > 2) {
-        violations.push({
-          type: 'BLOC_EXCES_JOUR',
-          severite: 'DURE',
-          message: `L'unité de ${prof.matiere} (${classesNoms}) a ${slotsJour.length} heures le ${jourNom}, dépasse la limite maximale de 2 h par jour.`,
-          uniteId: unite.id,
-          profId: prof.id,
-          profNom: prof.nom,
-          jourNom,
-        });
-      }
-
-      // (5.B) Si 2h le même jour : elles doivent être strictement consécutives sans trou et sans chevaucher la pause
-      if (slotsJour.length === 2) {
-        if (!areSlotsConsecutiveWithoutPause(slotsJour[0], slotsJour[1], data.semaine, options.respecterPauseMidiBlocs !== false)) {
-          const c0 = getSlotCoordinates(slotsJour[0], data.semaine);
-          const c1 = getSlotCoordinates(slotsJour[1], data.semaine);
-          const isPauseCross = c0.creneauNumero === 4 && c1.creneauNumero === 5;
+        if (slotsJour.length > maxBlockAllowed) {
           violations.push({
-            type: 'BLOC_NON_CONSECUTIF',
+            type: 'BLOC_EXCES_JOUR',
             severite: 'DURE',
-            message: isPauseCross
-              ? `Les 2 heures de ${prof.matiere} (${classesNoms}) le ${jourNom} chevauchent la pause méridienne de 1h (C4 et C5) : la journée de 7h est divisée en 2 grands blocs (4h puis 1h de pause puis 3h).`
-              : `Les 2 heures de ${prof.matiere} (${classesNoms}) le ${jourNom} doivent être consécutives sans trou (créneaux non adjacents placés : C${c0.creneauNumero} et C${c1.creneauNumero}).`,
+            message: `L'unité de ${prof.matiere} (${classesNoms}) a ${slotsJour.length} heures le ${jourNom}, dépasse le maximum autorisé (${maxBlockAllowed} h par jour pour ce découpage).`,
             uniteId: unite.id,
             profId: prof.id,
             profNom: prof.nom,
             jourNom,
           });
         }
+
+        if (slotsJour.length >= 2) {
+          if (
+            !areSlotsConsecutiveBlockWithoutPause(
+              slotsJour,
+              data.semaine,
+              options.respecterPauseMidiBlocs !== false
+            )
+          ) {
+            violations.push({
+              type: 'BLOC_NON_CONSECUTIF',
+              severite: options.relaxedMode ? 'SOUPLE' : 'DURE',
+              message: `Les ${slotsJour.length} heures de ${prof.matiere} (${classesNoms}) le ${jourNom} doivent être consécutives sans trou et sans franchir la pause méridienne.`,
+              uniteId: unite.id,
+              profId: prof.id,
+              profNom: prof.nom,
+              jourNom,
+            });
+          }
+        }
       }
 
-      // Comptage des séances isolées de 1h
-      if (slotsJour.length === 1) {
-        joursAvecUneHeure++;
+      // Vérification de la conformité du découpage global lorsque toutes les heures sont placées
+      if (placedSlots.length === unite.heures) {
+        const actualBlocks = Array.from(slotsParJour.values())
+          .map((s) => s.length)
+          .sort((a, b) => b - a);
+
+        const matchesPossibility = matchingRule.possibilites.some((pos) => {
+          const sortedPos = [...pos].sort((a, b) => b - a);
+          if (sortedPos.length !== actualBlocks.length) return false;
+          return sortedPos.every((val, idx) => val === actualBlocks[idx]);
+        });
+
+        if (!matchesPossibility) {
+          const possibleStrs = matchingRule.possibilites
+            .map((p) => p.join('h + ') + 'h')
+            .join(' OU ');
+          violations.push({
+            type: 'BLOC_REPARTITION_NON_CONFORME',
+            severite: options.relaxedMode ? 'SOUPLE' : 'DURE',
+            message: `La répartition des séances de ${prof.matiere} (${classesNoms}) en [${actualBlocks.join('h + ')}h] ne correspond à aucune des possibilités de blocs paramétrées (${possibleStrs}).`,
+            uniteId: unite.id,
+            profId: prof.id,
+            profNom: prof.nom,
+          });
+        }
       }
-    }
+    } else {
+      // --- MODÈLE STANDARD (Flexible : 1h, 2h ou 3h selon la grille par matière) ---
+      const subjectLimit: number =
+        (prof.matiere ? options.maxHeuresParJourParMatiere?.[prof.matiere] : undefined)
+        ?? options.maxHeuresParJourUnite
+        ?? 2;
+      let joursAvecUneHeure = 0;
 
-    // (5.C) Une heure isolée seulement si la charge de l'unité est impaire
-    // Cette règle globale sur le nombre de séances de 1h ne s'applique que lorsque toutes les heures de l'unité sont placées
-    if (placedSlots.length === unite.heures) {
-      const chargeEstImpaire = unite.heures % 2 !== 0;
+      for (const [jourIndex, slotsJour] of slotsParJour.entries()) {
+        const jourNom = data.semaine.jours[jourIndex] || `Jour ${jourIndex + 1}`;
+        slotsJour.sort((a, b) => a - b);
 
-      if (!chargeEstImpaire && joursAvecUneHeure > 0) {
-        violations.push({
-          type: 'BLOC_HEURE_ISOLEE_INVALIDE',
-          severite: 'DURE',
-          message: `L'unité de ${prof.matiere} (${classesNoms}) a une charge paire (${unite.heures} h) : elle ne doit comporter que des blocs de 2 h consécutives (${joursAvecUneHeure} séance(s) isolée(s) de 1 h détectée(s)).`,
-          uniteId: unite.id,
-          profId: prof.id,
-          profNom: prof.nom,
-        });
-      } else if (chargeEstImpaire && joursAvecUneHeure > 1) {
-        violations.push({
-          type: 'BLOC_HEURE_ISOLEE_INVALIDE',
-          severite: 'DURE',
-          message: `L'unité de ${prof.matiere} (${classesNoms}) a une charge impaire (${unite.heures} h) : une seule séance d'une heure isolée est permise (${joursAvecUneHeure} séances de 1 h détectées).`,
-          uniteId: unite.id,
-          profId: prof.id,
-          profNom: prof.nom,
-        });
+        // (5.A) Dépassement de la limite maximale par jour pour cette matière
+        if (slotsJour.length > (options.relaxedMode ? Math.max(subjectLimit, 3) : subjectLimit)) {
+          violations.push({
+            type: 'BLOC_EXCES_JOUR',
+            severite: 'DURE',
+            message: `L'unité de ${prof.matiere} (${classesNoms}) a ${slotsJour.length} heures le ${jourNom}, dépasse la limite maximale de ${subjectLimit} h par jour configurée pour cette matière.`,
+            uniteId: unite.id,
+            profId: prof.id,
+            profNom: prof.nom,
+            jourNom,
+          });
+        }
+
+        // (5.B) Si 2h ou 3h le même jour : elles doivent être strictement consécutives sans trou et sans chevaucher la pause
+        if (slotsJour.length >= 2) {
+          if (
+            !areSlotsConsecutiveBlockWithoutPause(
+              slotsJour,
+              data.semaine,
+              options.respecterPauseMidiBlocs !== false
+            )
+          ) {
+            const isPauseCross = slotsJour.some((s, idx) => {
+              if (idx === 0) return false;
+              const prevCoords = getSlotCoordinates(slotsJour[idx - 1], data.semaine);
+              const currCoords = getSlotCoordinates(s, data.semaine);
+              return prevCoords.creneauNumero === 4 && currCoords.creneauNumero === 5;
+            });
+            violations.push({
+              type: 'BLOC_NON_CONSECUTIF',
+              severite: options.relaxedMode ? 'SOUPLE' : 'DURE',
+              message: isPauseCross
+                ? `Les ${slotsJour.length} heures de ${prof.matiere} (${classesNoms}) le ${jourNom} chevauchent la pause méridienne de 1h (C4 et C5) : la journée de 7h est divisée en 2 grands blocs (4h puis 1h de pause puis 3h).`
+                : `Les ${slotsJour.length} heures de ${prof.matiere} (${classesNoms}) le ${jourNom} doivent être consécutives sans trou.`,
+              uniteId: unite.id,
+              profId: prof.id,
+              profNom: prof.nom,
+              jourNom,
+            });
+          }
+        }
+
+        if (slotsJour.length === 1) {
+          joursAvecUneHeure++;
+        }
+      }
+
+      // (5.C) Pour les matières en mode 2h standard : vérification de la parité des heures isolées
+      if (subjectLimit === 2 && placedSlots.length === unite.heures) {
+        const chargeEstImpaire = unite.heures % 2 !== 0;
+
+        if (!chargeEstImpaire && joursAvecUneHeure > 0) {
+          violations.push({
+            type: 'BLOC_HEURE_ISOLEE_INVALIDE',
+            severite: options.relaxedMode ? 'SOUPLE' : 'DURE',
+            message: `L'unité de ${prof.matiere} (${classesNoms}) a une charge paire (${unite.heures} h) : elle ne doit comporter que des blocs de 2 h consécutives (${joursAvecUneHeure} séance(s) isolée(s) de 1 h détectée(s)).`,
+            uniteId: unite.id,
+            profId: prof.id,
+            profNom: prof.nom,
+          });
+        } else if (chargeEstImpaire && joursAvecUneHeure > 1) {
+          violations.push({
+            type: 'BLOC_HEURE_ISOLEE_INVALIDE',
+            severite: options.relaxedMode ? 'SOUPLE' : 'DURE',
+            message: `L'unité de ${prof.matiere} (${classesNoms}) a une charge impaire (${unite.heures} h) : une seule séance d'une heure isolée est permise (${joursAvecUneHeure} séances de 1 h détectées).`,
+            uniteId: unite.id,
+            profId: prof.id,
+            profNom: prof.nom,
+          });
+        }
       }
     }
   }
@@ -522,7 +719,17 @@ export function score(
     affsParUnite.set(aff.uniteId, list);
   }
 
+  const uniteMap = new Map(data.unites.map((u) => [u.id, u]));
+  const teacherMap = new Map(data.teachers.map((t) => [t.id, t]));
+
   for (const [uniteId, slots] of affsParUnite.entries()) {
+    const unite = uniteMap.get(uniteId);
+    const teacher = unite ? teacherMap.get(unite.teacherId) : undefined;
+    const subjectLimit: number =
+      (teacher?.matiere ? options.maxHeuresParJourParMatiere?.[teacher.matiere] : undefined)
+      ?? options.maxHeuresParJourUnite
+      ?? 2;
+
     const slotsParJour = new Map<number, number[]>();
     for (const slot of slots) {
       const coords = getSlotCoordinates(slot, data.semaine);
@@ -534,9 +741,9 @@ export function score(
     for (const [jourIndex, slotsJour] of slotsParJour.entries()) {
       const h = slotsJour.length;
 
-      // Règle souple 1 : max 2h par jour et par unité (pénalité 100 par heure en excès)
-      if (h > options.maxHeuresParJourUnite) {
-        const exces = h - options.maxHeuresParJourUnite;
+      // Règle souple 1 : max par jour et par unité (pénalité 100 par heure en excès au-delà de subjectLimit)
+      if (h > subjectLimit) {
+        const exces = h - subjectLimit;
         penalitesExcesJour += exces * options.penaliteHeureExcParJour;
       }
 
@@ -664,32 +871,117 @@ export function canPlace(
     }
   }
 
-  // 6. Contraintes spécifiques aux blocs de 2h consécutives (toutes matières par défaut)
-  if (teacher && isBlockSubject(teacher.matiere, options.matieresABlocs, options.toutesMatieresABlocs !== false)) {
-    // Récupérer les créneaux déjà placés pour cette unité le même jour
+  // 6. Contraintes spécifiques aux blocs (matière/niveau ou blocs standards de 2h)
+  if (teacher) {
+    const classesNiveaux = unite.classeIds
+      .map((cid) => classMap.get(cid)?.niveau || '')
+      .filter(Boolean)
+      .join(' / ');
+
+    const matchingRule = findMatchingBlockRule(
+      teacher.matiere,
+      classesNiveaux,
+      unite.heures,
+      options.subjectBlockRules
+    );
+
     const slotsMemeJour = planning
       .filter((a) => a.uniteId === unite.id)
       .map((a) => a.slot)
       .filter((s) => getSlotCoordinates(s, data.semaine).jourIndex === coords.jourIndex);
 
-    // 6.A : Jamais plus de 2h par jour
-    if (slotsMemeJour.length >= 2) {
-      raisons.push(
-        `La matière (${teacher.matiere}) ne peut pas dépasser 2 heures par jour (déjà ${slotsMemeJour.length} h le ${coords.jourNom}).`
+    if (matchingRule && matchingRule.possibilites.length > 0) {
+      // Règle personnalisée de découpage en blocs (max 3h)
+      const maxBlock = Math.min(
+        3,
+        Math.max(1, ...matchingRule.possibilites.map((p) => Math.max(...p)))
       );
-    } else if (slotsMemeJour.length === 1) {
-      // 6.B : Si 1h déjà présente ce jour, la 2ème heure DOIT former un bloc consécutif sans trou et sans pause
-      const existant = slotsMemeJour[0];
-      if (!areSlotsConsecutiveWithoutPause(existant, slot, data.semaine, options.respecterPauseMidiBlocs !== false)) {
-        const cEx = getSlotCoordinates(existant, data.semaine);
-        const isPauseCross =
-          (cEx.creneauNumero === 4 && coords.creneauNumero === 5) ||
-          (cEx.creneauNumero === 5 && coords.creneauNumero === 4);
+
+      if (slotsMemeJour.length >= maxBlock) {
         raisons.push(
-          isPauseCross
-            ? `Impossible de former un bloc de 2h à cheval sur la pause méridienne de 1h (entre C4 et C5).`
-            : `Pour la matière (${teacher.matiere}), les 2 heures le ${coords.jourNom} doivent être consécutives sans trou (actuel: C${cEx.creneauNumero}).`
+          `La matière (${teacher.matiere}) ne peut pas dépasser ${maxBlock} heures par jour (déjà ${slotsMemeJour.length} h le ${coords.jourNom}).`
         );
+      } else if (slotsMemeJour.length >= 1 && !options.relaxedMode) {
+        const candidateSlots = [...slotsMemeJour, slot];
+        if (
+          !areSlotsConsecutiveBlockWithoutPause(
+            candidateSlots,
+            data.semaine,
+            options.respecterPauseMidiBlocs !== false
+          )
+        ) {
+          raisons.push(
+            `Pour la matière (${teacher.matiere}), les séances le ${coords.jourNom} doivent former un bloc consécutif (max 3h) sans trou et sans franchir la pause méridienne.`
+          );
+        }
+      }
+    } else if (
+      isBlockSubject(
+        teacher.matiere,
+        options.matieresABlocs,
+        options.toutesMatieresABlocs !== false
+      ) ||
+      (options.maxHeuresParJourParMatiere && options.maxHeuresParJourParMatiere[teacher.matiere] !== undefined)
+    ) {
+      const subjectLimit = (options.maxHeuresParJourParMatiere && options.maxHeuresParJourParMatiere[teacher.matiere])
+        ?? options.maxHeuresParJourUnite
+        ?? 2;
+
+      if (subjectLimit === 1) {
+        // Limite stricte à 1h par jour
+        if (slotsMemeJour.length >= 1) {
+          raisons.push(
+            `La matière (${teacher.matiere}) est configurée avec un maximum de 1h par séance/jour (déjà ${slotsMemeJour.length} h le ${coords.jourNom}).`
+          );
+        }
+      } else if (subjectLimit === 3) {
+        // Limite étendue jusqu'à 3h par jour
+        if (slotsMemeJour.length >= (options.relaxedMode ? 4 : 3)) {
+          raisons.push(
+            `La matière (${teacher.matiere}) ne peut pas dépasser 3 heures par jour (déjà ${slotsMemeJour.length} h le ${coords.jourNom}).`
+          );
+        } else if (slotsMemeJour.length >= 1 && !options.relaxedMode) {
+          const candidateSlots = [...slotsMemeJour, slot];
+          if (
+            !areSlotsConsecutiveBlockWithoutPause(
+              candidateSlots,
+              data.semaine,
+              options.respecterPauseMidiBlocs !== false
+            )
+          ) {
+            raisons.push(
+              `Pour la matière (${teacher.matiere}), les séances le ${coords.jourNom} doivent former un bloc consécutif (max 3h) sans trou et sans franchir la pause méridienne.`
+            );
+          }
+        }
+      } else {
+        // 6.A : Standard 2h par jour
+        if (slotsMemeJour.length >= (options.relaxedMode ? 3 : 2)) {
+          raisons.push(
+            `La matière (${teacher.matiere}) ne peut pas dépasser 2 heures par jour (déjà ${slotsMemeJour.length} h le ${coords.jourNom}).`
+          );
+        } else if (slotsMemeJour.length === 1 && !options.relaxedMode) {
+          // 6.B : Si 1h déjà présente ce jour, la 2ème heure DOIT former un bloc consécutif sans trou et sans pause
+          const existant = slotsMemeJour[0];
+          if (
+            !areSlotsConsecutiveWithoutPause(
+              existant,
+              slot,
+              data.semaine,
+              options.respecterPauseMidiBlocs !== false
+            )
+          ) {
+            const cEx = getSlotCoordinates(existant, data.semaine);
+            const isPauseCross =
+              (cEx.creneauNumero === 4 && coords.creneauNumero === 5) ||
+              (cEx.creneauNumero === 5 && coords.creneauNumero === 4);
+            raisons.push(
+              isPauseCross
+                ? `Impossible de former un bloc de 2h à cheval sur la pause méridienne de 1h (entre C4 et C5).`
+                : `Pour la matière (${teacher.matiere}), les 2 heures le ${coords.jourNom} doivent être consécutives sans trou (actuel: C${cEx.creneauNumero}).`
+            );
+          }
+        }
       }
     }
   }

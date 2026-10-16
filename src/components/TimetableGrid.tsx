@@ -182,6 +182,14 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
   const hardViolations = useMemo(() => liveViolations.filter((v) => v.severite === 'DURE'), [liveViolations]);
   const softViolations = useMemo(() => liveViolations.filter((v) => v.severite === 'SOUPLE'), [liveViolations]);
 
+  const totalRequiredHours = useMemo(() => {
+    return dataset.unites.reduce((sum, u) => sum + u.heures, 0);
+  }, [dataset]);
+  const missingHours = Math.max(0, totalRequiredHours - currentPlanning.length);
+  const insertionRate = totalRequiredHours > 0
+    ? Math.round((currentPlanning.length / totalRequiredHours) * 100)
+    : 100;
+
   const [showViolationsPanel, setShowViolationsPanel] = useState(false);
 
   // --- DÉPLACEMENT ET ÉCHANGE DE COURS ---
@@ -298,13 +306,7 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
   // --- RELANCER LE SOLVEUR AVEC LES COURS VERROUILLÉS FIXÉS ---
   const handleRegenerateWithLocks = () => {
     if (lockedAssignments.length === 0) {
-      if (
-        window.confirm(
-          "Aucun cours n'est actuellement verrouillé. Souhaitez-vous lancer une génération standard ?"
-        )
-      ) {
-        onOpenGenerator();
-      }
+      onOpenGenerator();
       return;
     }
 
@@ -501,6 +503,39 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Alerte si des matières ne sont pas affectées à 100 % avec appel à la recommandation IA */}
+      {missingHours > 0 && (
+        <div className="bg-gradient-to-r from-indigo-50/90 via-purple-50/70 to-amber-50/80 border border-indigo-200/90 rounded-xl p-4 text-xs shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in duration-200">
+          <div className="flex items-start gap-2.5">
+            <div className="p-1.5 rounded-lg bg-indigo-600 text-white shrink-0 mt-0.5 shadow-2xs">
+              <Sparkles className="w-4 h-4 text-amber-300" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-bold text-slate-900">
+                  Matières incomplètes ({missingHours} h non affectée(s) sur {totalRequiredHours} h requises)
+                </span>
+                <span className="font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 text-[10px]">
+                  Taux d'insertion : {insertionRate} %
+                </span>
+              </div>
+              <p className="text-slate-600 mt-0.5 text-[11px]">
+                Certaines contraintes (blocs de 2h max, créneaux interdits, plafonds journaliers) limitent le placement. L'IA propose d'assouplir des contraintes ciblées pour atteindre 100 % d'insertion.
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={onOpenGenerator}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-2xs transition-colors shrink-0 self-start sm:self-auto"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+            <span>Recommandations IA pour 100 %</span>
+          </button>
+        </div>
+      )}
 
       {/* Panneau dépliable des violations en direct (si des violations existent) */}
       {hardViolations.length > 0 && (

@@ -6,14 +6,17 @@
 import { describe, expect, it } from 'vitest';
 import { Classe, Semaine, Teacher, Unite } from '../../types';
 import {
+  areSlotsConsecutiveBlockWithoutPause,
   areSlotsConsecutiveWithoutPause,
   canPlace,
+  findMatchingBlockRule,
+  generatePossibleBlockPartitions,
   getSlotCoordinates,
   isBlockSubject,
   score,
   verify,
 } from '../index';
-import { Planning, ScheduleData } from '../types';
+import { Planning, ScheduleData, SubjectLevelBlockRule } from '../types';
 
 describe('Module rules - Emplois du temps', () => {
   // Structure de la semaine standard (32 créneaux : 4x7 + 4)
@@ -625,6 +628,229 @@ describe('Module rules - Emplois du temps', () => {
       const cpRes = canPlace(planningWithC4, uniteMath4h, 4, dataMath);
       expect(cpRes.ok).toBe(false);
       expect(cpRes.raisons.some((r) => r.includes('pause méridienne de 1h'))).toBe(true);
+    });
+
+    it('génère mathématiquement toutes les partitions possibles en blocs avec max 3h', () => {
+      const partitions7h = generatePossibleBlockPartitions(7, 3);
+      // Doit inclure [3, 3, 1], [3, 2, 2], [2, 2, 2, 1]
+      expect(partitions7h).toContainEqual([3, 3, 1]);
+      expect(partitions7h).toContainEqual([3, 2, 2]);
+      expect(partitions7h).toContainEqual([2, 2, 2, 1]);
+      // Chaque bloc doit être <= 3
+      for (const p of partitions7h) {
+        expect(p.reduce((a, b) => a + b, 0)).toBe(7);
+        expect(Math.max(...p)).toBeLessThanOrEqual(3);
+      }
+    });
+
+    it('valide les possibilités de blocs paramétrées pour une matière/niveau (ex: 7h = 3h+3h+1h ou 3h+2h+2h)', () => {
+      const uniteMath7h: Unite = {
+        id: 'u_math_7h',
+        teacherId: profMath.id,
+        classeIds: [classeBac1.id], // 1BAC
+        heures: 7,
+      };
+
+      const data7h: ScheduleData = {
+        ...testData,
+        unites: [uniteMath7h],
+      };
+
+      const regle7h: SubjectLevelBlockRule = {
+        id: 'rule_math_7h',
+        matiere: 'Mathématiques',
+        niveau: '1BAC',
+        heuresHebdo: 7,
+        possibilites: [
+          [2, 2, 2, 1],
+          [3, 3, 1],
+          [3, 2, 2],
+        ],
+        actif: true,
+      };
+
+      // Test Cas A : [3, 3, 1] -> Lundi 3h (C1,C2,C3), Mardi 3h (C1,C2,C3), Mercredi 1h (C1)
+      const planning331: Planning = [
+        { uniteId: uniteMath7h.id, slot: 0 }, // Lun C1
+        { uniteId: uniteMath7h.id, slot: 1 }, // Lun C2
+        { uniteId: uniteMath7h.id, slot: 2 }, // Lun C3
+        { uniteId: uniteMath7h.id, slot: 7 }, // Mar C1
+        { uniteId: uniteMath7h.id, slot: 8 }, // Mar C2
+        { uniteId: uniteMath7h.id, slot: 9 }, // Mar C3
+        { uniteId: uniteMath7h.id, slot: 14 }, // Mer C1
+      ];
+
+      const violations331 = verify(planning331, data7h, {
+        subjectBlockRules: [regle7h],
+      });
+      expect(violations331.filter((v) => v.severite === 'DURE')).toHaveLength(0);
+
+      // Test Cas B : [3, 2, 2] -> Lundi 3h (C1,C2,C3), Mardi 2h (C1,C2), Mercredi 2h (C1,C2)
+      const planning322: Planning = [
+        { uniteId: uniteMath7h.id, slot: 0 },
+        { uniteId: uniteMath7h.id, slot: 1 },
+        { uniteId: uniteMath7h.id, slot: 2 },
+        { uniteId: uniteMath7h.id, slot: 7 },
+        { uniteId: uniteMath7h.id, slot: 8 },
+        { uniteId: uniteMath7h.id, slot: 14 },
+        { uniteId: uniteMath7h.id, slot: 15 },
+      ];
+
+      const violations322 = verify(planning322, data7h, {
+        subjectBlockRules: [regle7h],
+      });
+      expect(violations322.filter((v) => v.severite === 'DURE')).toHaveLength(0);
+
+      // Test Cas C : Non-conforme aux possibilités -> ex: [3, 2, 1, 1] si non listé dans les possibilités
+      const regleRestreinte: SubjectLevelBlockRule = {
+        ...regle7h,
+        possibilites: [
+          [3, 3, 1],
+          [3, 2, 2],
+        ],
+      };
+      const planning3211: Planning = [
+        { uniteId: uniteMath7h.id, slot: 0 },
+        { uniteId: uniteMath7h.id, slot: 1 },
+        { uniteId: uniteMath7h.id, slot: 2 },
+        { uniteId: uniteMath7h.id, slot: 7 },
+        { uniteId: uniteMath7h.id, slot: 8 },
+        { uniteId: uniteMath7h.id, slot: 14 }, // Mer 1h
+        { uniteId: uniteMath7h.id, slot: 21 }, // Jeu 1h
+      ];
+
+      const violations3211 = verify(planning3211, data7h, {
+        subjectBlockRules: [regleRestreinte],
+      });
+      expect(violations3211.some((v) => v.type === 'BLOC_REPARTITION_NON_CONFORME')).toBe(true);
+
+      // Test Cas D : Dépassement du maximum de 3h par bloc (ex: 4h le lundi)
+      const planning4hLundi: Planning = [
+        { uniteId: uniteMath7h.id, slot: 0 },
+        { uniteId: uniteMath7h.id, slot: 1 },
+        { uniteId: uniteMath7h.id, slot: 2 },
+        { uniteId: uniteMath7h.id, slot: 3 }, // 4h le lundi !
+        { uniteId: uniteMath7h.id, slot: 7 },
+        { uniteId: uniteMath7h.id, slot: 8 },
+        { uniteId: uniteMath7h.id, slot: 14 },
+      ];
+      const violations4h = verify(planning4hLundi, data7h, {
+        subjectBlockRules: [regle7h],
+      });
+      expect(violations4h.some((v) => v.type === 'BLOC_EXCES_JOUR')).toBe(true);
+    });
+
+    it('autorise canPlace pour une 3ème heure consécutive lorsque les blocs de 3h sont configurés', () => {
+      const uniteMath7h: Unite = {
+        id: 'u_math_7h',
+        teacherId: profMath.id,
+        classeIds: [classeBac1.id],
+        heures: 7,
+      };
+
+      const data7h: ScheduleData = {
+        ...testData,
+        unites: [uniteMath7h],
+      };
+
+      const regle7h: SubjectLevelBlockRule = {
+        id: 'rule_math_7h',
+        matiere: 'Mathématiques',
+        niveau: '1BAC',
+        heuresHebdo: 7,
+        possibilites: [[3, 3, 1]],
+        actif: true,
+      };
+
+      // 2 heures consécutives déjà placées sur Lundi C1 et C2
+      const planning2h: Planning = [
+        { uniteId: uniteMath7h.id, slot: 0 },
+        { uniteId: uniteMath7h.id, slot: 1 },
+      ];
+
+      // Tenter de placer Lundi C3 (slot 2) -> doit réussir car 3h consécutives autorisées
+      const cp3 = canPlace(planning2h, uniteMath7h, 2, data7h, {
+        subjectBlockRules: [regle7h],
+      });
+      expect(cp3.ok).toBe(true);
+
+      // Mais tenter de placer Lundi C4 (slot 3) quand 3h sont déjà placées -> doit échouer (max 3h)
+      const planning3h: Planning = [
+        { uniteId: uniteMath7h.id, slot: 0 },
+        { uniteId: uniteMath7h.id, slot: 1 },
+        { uniteId: uniteMath7h.id, slot: 2 },
+      ];
+      const cp4 = canPlace(planning3h, uniteMath7h, 3, data7h, {
+        subjectBlockRules: [regle7h],
+      });
+      expect(cp4.ok).toBe(false);
+      expect(cp4.raisons.some((r) => r.includes('3 heures par jour'))).toBe(true);
+    });
+
+    it('gère la règle flexible de limite journalière par matière (1h, 2h ou 3h)', () => {
+      // 1. Matière limitée à 1h par séance / jour (ex: SVT ou Anglais)
+      const options1h = {
+        maxHeuresParJourParMatiere: {
+          Anglais: 1 as const,
+        },
+      };
+
+      // Le créneau 0 (Lundi C1) peut être placé
+      const cp1 = canPlace([], uniteAnglais3h, 0, testData, options1h);
+      expect(cp1.ok).toBe(true);
+
+      // Le créneau 1 (Lundi C2) sur le même jour doit être refusé car limité à 1h
+      const planning1h: Planning = [{ uniteId: uniteAnglais3h.id, slot: 0 }];
+      const cp2 = canPlace(planning1h, uniteAnglais3h, 1, testData, options1h);
+      expect(cp2.ok).toBe(false);
+      expect(cp2.raisons.some((r) => r.includes('maximum de 1h'))).toBe(true);
+
+      // Par contre, un créneau sur un autre jour (Mardi C1 = slot 7) doit être accepté
+      const cpMardi = canPlace(planning1h, uniteAnglais3h, 7, testData, options1h);
+      expect(cpMardi.ok).toBe(true);
+
+      // Vérification verify() avec 2h le même jour pour matière à 1h max
+      const planningInfraction1h: Planning = [
+        { uniteId: uniteAnglais3h.id, slot: 0 },
+        { uniteId: uniteAnglais3h.id, slot: 1 },
+      ];
+      const violations1h = verify(planningInfraction1h, testData, options1h);
+      expect(violations1h.some((v) => v.type === 'BLOC_EXCES_JOUR' && v.message.includes('1 h par jour'))).toBe(true);
+
+      // 2. Matière limitée à 3h par jour (ex: Mathématiques autorisées jusqu'à 3h)
+      const options3h = {
+        maxHeuresParJourParMatiere: {
+          'Mathématiques': 3 as const,
+        },
+      };
+
+      // 2h consécutives sur Lundi C1 et C2
+      const planningMath2h: Planning = [
+        { uniteId: uniteMath4h.id, slot: 0 },
+        { uniteId: uniteMath4h.id, slot: 1 },
+      ];
+
+      // Tenter de placer Lundi C3 (slot 2) -> accepté car la matière autorise 3h
+      const cpMath3 = canPlace(planningMath2h, uniteMath4h, 2, testData, options3h);
+      expect(cpMath3.ok).toBe(true);
+
+      // Mais une 4ème heure (slot 3) doit être refusée
+      const planningMath3h: Planning = [
+        { uniteId: uniteMath4h.id, slot: 0 },
+        { uniteId: uniteMath4h.id, slot: 1 },
+        { uniteId: uniteMath4h.id, slot: 2 },
+      ];
+      const cpMath4 = canPlace(planningMath3h, uniteMath4h, 3, testData, options3h);
+      expect(cpMath4.ok).toBe(false);
+      expect(cpMath4.raisons.some((r) => r.includes('3 heures par jour'))).toBe(true);
+
+      // Score : avec 3h autorisées pour Maths, aucune pénalité d'excès journalier pour 3h
+      const score3h = score(planningMath3h, testData, options3h);
+      expect(score3h.penalitesExcesJour).toBe(0);
+
+      // Avec 2h par défaut (sans config 3h), 3h déclenchent une pénalité d'excès (1 heure au-delà de 2h = 100 pts)
+      const scoreDefaut = score(planningMath3h, testData, { maxHeuresParJourParMatiere: {} });
+      expect(scoreDefaut.penalitesExcesJour).toBe(100);
     });
   });
 });

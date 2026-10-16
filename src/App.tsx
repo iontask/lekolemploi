@@ -14,15 +14,16 @@ import {
   saveMappingConfig,
 } from './services/db';
 import { parseExcelWorkbook } from './services/excelParser';
-import { buildOfficialSampleDataset } from './services/sampleData';
+import { buildOfficialSampleDataset, SamplePreset } from './services/sampleData';
 import { TopBar } from './components/TopBar';
 import { ImportZone } from './components/ImportZone';
 import { ControlDashboard } from './components/ControlDashboard';
 import { MappingModal } from './components/MappingModal';
 import { GenerationModal } from './components/GenerationModal';
 import { ProjectManagerModal } from './components/ProjectManagerModal';
+import { ResetConfirmModal } from './components/ResetConfirmModal';
 import { Planning, RulesOptions } from './rules/types';
-import { SolverResult } from './solver/types';
+import { SolverConfig, SolverResult } from './solver/types';
 import { ScheduleScenario } from './types/scenarios';
 import { exportProjectToJson } from './utils/projectJsonIO';
 import { AlertCircle, CheckCircle2, Info, X } from 'lucide-react';
@@ -52,6 +53,7 @@ export function App() {
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isGenerationOpen, setIsGenerationOpen] = useState(false);
   const [isProjectManagerOpen, setIsProjectManagerOpen] = useState(false);
+  const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
   const [isRelaxedModeForGen, setIsRelaxedModeForGen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -129,15 +131,42 @@ export function App() {
     }
   };
 
+  // Chargement direct d'un preset d'exemple (aSc Timetables ou Référence)
+  const handleLoadSamplePreset = async (preset: SamplePreset) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const loadedDataset = preset.load();
+      await persistDataset(loadedDataset);
+      setIsImportOpen(false);
+      if (preset.hasPlanning && loadedDataset.planning && loadedDataset.planning.length > 0) {
+        setActiveView('timetable');
+        addToast(
+          `« ${preset.name} » chargé (${loadedDataset.planning.length}h placées). Vous pouvez ajuster via le bac et le drag & drop.`,
+          'success'
+        );
+      } else {
+        setActiveView('dashboard');
+        addToast(`« ${preset.name} » chargé avec succès. Prêt pour la génération.`, 'success');
+      }
+    } catch (err: any) {
+      console.error('Erreur lors du chargement de l\'exemple:', err);
+      setError("Erreur lors de l'initialisation de l'exemple.");
+      addToast('Erreur lors du chargement de l\'exemple.', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Chargement direct du jeu de test officiel (28 profs, 12 classes, 360h)
   const handleLoadOfficialDemo = async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const demoDataset = buildOfficialSampleDataset();
+      const demoDataset = buildOfficialSampleDataset(true);
       await persistDataset(demoDataset);
       setIsImportOpen(false);
-      setActiveView('dashboard');
+      setActiveView('timetable');
       addToast('Jeu de référence officiel (360 h) chargé avec succès.', 'success');
     } catch (err: any) {
       console.error('Erreur lors du chargement des données de test:', err);
@@ -173,16 +202,17 @@ export function App() {
   };
 
   // Application du planning généré par le solveur
-  const handleApplyPlanning = async (newPlanning: Planning, result: SolverResult) => {
+  const handleApplyPlanning = async (newPlanning: Planning, result: SolverResult, appliedConfig?: SolverConfig) => {
     if (!dataset) return;
     const updatedDataset: ImportDataset = {
       ...dataset,
       planning: newPlanning,
       solverResult: result,
+      constraints: appliedConfig ? { ...(dataset.constraints || {}), ...appliedConfig } : dataset.constraints,
     };
     await persistDataset(updatedDataset);
     setActiveView('timetable');
-    addToast(`Emploi du temps généré : ${newPlanning.length} heures placées.`, 'success');
+    addToast(`Emploi du temps appliqué : ${newPlanning.length} heures placées.`, 'success');
   };
 
   // Mise à jour en direct du planning (suite à glisser-déposer ou annuler/rétablir)
@@ -234,15 +264,33 @@ export function App() {
     addToast(`Scénario « ${sc.name} » appliqué à l'emploi du temps.`, 'success');
   };
 
-  // Réinitialisation complète
-  const handleReset = async () => {
-    if (window.confirm('Voulez-vous réinitialiser et effacer les données enregistrées dans IndexedDB ?')) {
+  // Ouverture du modal de confirmation de réinitialisation
+  const handleOpenResetConfirm = () => {
+    setIsResetConfirmOpen(true);
+  };
+
+  // Réinitialisation complète sécurisée via le modal
+  const handleConfirmReset = async (resetMapping: boolean) => {
+    try {
+      setIsLoading(true);
       await clearAllData();
+      if (resetMapping) {
+        setConfig(DEFAULT_MAPPING_CONFIG);
+        await saveMappingConfig(DEFAULT_MAPPING_CONFIG);
+      }
       setDataset(null);
       setLastUploadedBuffer(null);
       setError(null);
+      setLastSavedAt(null);
+      setLockedAssignmentsForGen([]);
       setActiveView('dashboard');
-      addToast('Toutes les données ont été réinitialisées.', 'info');
+      setIsImportOpen(false);
+      addToast('Toutes les données ont été réinitialisées avec succès.', 'info');
+    } catch (err: any) {
+      console.error('Erreur lors de la réinitialisation:', err);
+      addToast('Erreur lors de la réinitialisation des données.', 'error');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -256,6 +304,7 @@ export function App() {
         onOpenImport={() => setIsImportOpen(true)}
         onOpenProjects={() => setIsProjectManagerOpen(true)}
         onExportJson={() => dataset && exportProjectToJson(dataset)}
+        onSelectSamplePreset={handleLoadSamplePreset}
         projectName={dataset?.fileName}
         isSaving={isSaving}
         lastSavedAt={lastSavedAt}
@@ -266,7 +315,7 @@ export function App() {
         }}
         hasDataset={dataset !== null}
         hasPlanning={Boolean(dataset?.planning && dataset.planning.length > 0)}
-        onReset={handleReset}
+        onReset={handleOpenResetConfirm}
       />
 
       {/* Contenu principal */}
@@ -286,6 +335,7 @@ export function App() {
             <ImportZone
               onFileLoaded={handleFileLoaded}
               onLoadOfficialDemo={handleLoadOfficialDemo}
+              onSelectSamplePreset={handleLoadSamplePreset}
               onOpenMapping={() => setIsMappingOpen(true)}
               config={config}
               isLoading={isLoading}
@@ -350,6 +400,14 @@ export function App() {
           initialRelaxedMode={isRelaxedModeForGen}
         />
       )}
+
+      {/* Modal de Confirmation de Réinitialisation */}
+      <ResetConfirmModal
+        isOpen={isResetConfirmOpen}
+        onClose={() => setIsResetConfirmOpen(false)}
+        onConfirm={handleConfirmReset}
+        projectName={dataset?.fileName}
+      />
 
       {/* Système de notifications Toast propre */}
       <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm pointer-events-none">

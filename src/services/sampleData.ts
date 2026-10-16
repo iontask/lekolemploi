@@ -430,14 +430,14 @@ export const RAW_TEACHER_SEEDS: RawTeacherSeed[] = [
 ];
 
 import referenceData from '../data/referencePlanning360.json';
+import ascData from '../data/ascTimetableMinhaEscola.json';
 
 /**
- * Crée le jeu de données officiel de référence : 28 profs, 12 classes, 360 heures exactes,
- * avec l'emploi du temps 360h sans conflit et blocs respectés pré-calculé.
+ * Crée le jeu de données officiel de référence : 28 profs, 12 classes, 360 heures exactes.
  */
-export function buildOfficialSampleDataset(): ImportDataset {
+export function buildOfficialSampleDataset(withPlanning = true): ImportDataset {
   const cloned = JSON.parse(JSON.stringify(referenceData.dataset)) as ImportDataset;
-  const planning = JSON.parse(JSON.stringify(referenceData.planning));
+  const planning = withPlanning ? JSON.parse(JSON.stringify(referenceData.planning)) : [];
 
   const report = generateAuditReport(
     cloned.teachers,
@@ -449,10 +449,138 @@ export function buildOfficialSampleDataset(): ImportDataset {
   return {
     ...cloned,
     id: `ds_ref_360h_${Date.now()}`,
+    fileName: withPlanning
+      ? 'Emploi_du_Temps_Reference_360h.xlsx'
+      : 'Emploi_du_Temps_Reference_Vierge_360h.xlsx',
     importedAt: new Date().toISOString(),
     planning,
     report,
   };
 }
 
+/**
+ * Crée le jeu de données déduit des outputs du logiciel aSc Timetables (Minha Escola) :
+ * 29 profs, 12 classes, 384 heures au total, avec 381 heures planifiées fidèlement.
+ * Les heures non placées ou déplaçables vont dans le bac de cours non affectés en haut de grille.
+ */
+export function buildAscTimetableSampleDataset(withPlanning = true): ImportDataset {
+  const cloned = JSON.parse(JSON.stringify(ascData.dataset)) as ImportDataset;
+  const planning = withPlanning ? JSON.parse(JSON.stringify(ascData.planning)) : [];
+
+  const report = generateAuditReport(
+    cloned.teachers,
+    cloned.classes,
+    cloned.unites,
+    cloned.semaine
+  );
+
+  return {
+    ...cloned,
+    id: `ds_asc_minha_escola_${Date.now()}`,
+    fileName: withPlanning
+      ? 'Emploi_du_Temps_aSc_MinhaEscola_384h.xlsx'
+      : 'Emploi_du_Temps_aSc_MinhaEscola_Vierge_384h.xlsx',
+    importedAt: new Date().toISOString(),
+    planning,
+    report,
+    constraints: cloned.constraints || {
+      toutesMatieresABlocs: false,
+      matieresABlocs: ['Arabe', 'Anglais'],
+      prefererBlocs2hMemeJour: true,
+      maxHeuresParJourUnite: 2,
+      maxHeuresParJourProf: 6,
+      maxHeuresParJourClasse: 6,
+      respecterPauseMidiBlocs: true,
+    },
+  };
+}
+
 export const createSampleDataset = buildOfficialSampleDataset;
+
+export interface SamplePreset {
+  id: string;
+  name: string;
+  shortLabel: string;
+  badge: string;
+  badgeStyle: string;
+  category: 'asc' | 'official';
+  description: string;
+  totalHours: number;
+  classesCount: number;
+  teachersCount: number;
+  hasPlanning: boolean;
+  plannedHours: number;
+  unassignedHours: number;
+  load: () => ImportDataset;
+}
+
+export const SAMPLE_PRESETS: SamplePreset[] = [
+  {
+    id: 'asc-minha-escola-with-planning',
+    name: 'aSc Timetables — Minha Escola (381 h)',
+    shortLabel: 'aSc Réel (381 h)',
+    badge: 'Emploi du temps aSc Réel',
+    badgeStyle: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+    category: 'asc',
+    description:
+      'Sortie réelle du logiciel aSc Timetables (12 classes, 29 profs, 381 h). Emploi du temps complet + bac interactif pour ajustements et drag & drop.',
+    totalHours: 381,
+    classesCount: 12,
+    teachersCount: 29,
+    hasPlanning: true,
+    plannedHours: 381,
+    unassignedHours: 0,
+    load: () => buildAscTimetableSampleDataset(true),
+  },
+  {
+    id: 'asc-minha-escola-empty',
+    name: 'aSc Timetables — Minha Escola (Vierge, 381 h)',
+    shortLabel: 'aSc Vierge (381 h)',
+    badge: 'Structure à générer',
+    badgeStyle: 'bg-indigo-100 text-indigo-800 border-indigo-300',
+    category: 'asc',
+    description:
+      'Structure complète des 12 classes et 29 enseignants aSc prête pour une nouvelle résolution automatique avec le solveur MIP.',
+    totalHours: 381,
+    classesCount: 12,
+    teachersCount: 29,
+    hasPlanning: false,
+    plannedHours: 0,
+    unassignedHours: 381,
+    load: () => buildAscTimetableSampleDataset(false),
+  },
+  {
+    id: 'official-reference-360h-with-planning',
+    name: 'Modèle Officiel Résolu (360 h)',
+    shortLabel: 'Officiel Résolu (360 h)',
+    badge: '100% sans conflit',
+    badgeStyle: 'bg-blue-100 text-blue-800 border-blue-300',
+    category: 'official',
+    description:
+      'Emploi du temps de référence 100% planifié (28 profs, 12 classes, 360 h), cours communs fusionnés 1BAC et blocs de 2h respectés.',
+    totalHours: 360,
+    classesCount: 12,
+    teachersCount: 28,
+    hasPlanning: true,
+    plannedHours: 360,
+    unassignedHours: 0,
+    load: () => buildOfficialSampleDataset(true),
+  },
+  {
+    id: 'official-reference-360h-empty',
+    name: 'Modèle Officiel Vierge (360 h)',
+    shortLabel: 'Officiel Vierge (360 h)',
+    badge: 'Structure à générer',
+    badgeStyle: 'bg-slate-100 text-slate-800 border-slate-300',
+    category: 'official',
+    description:
+      '28 profs, 12 classes, 360 h avec cours communs 1BAC, prêt pour une génération intégrale.',
+    totalHours: 360,
+    classesCount: 12,
+    teachersCount: 28,
+    hasPlanning: false,
+    plannedHours: 0,
+    unassignedHours: 360,
+    load: () => buildOfficialSampleDataset(false),
+  },
+];

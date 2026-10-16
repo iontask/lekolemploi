@@ -4,7 +4,12 @@
  */
 
 import { Classe, Teacher, Unite } from '../types';
-import { areSlotsConsecutiveWithoutPause, getSlotCoordinates, isBlockSubject } from '../rules';
+import {
+  areSlotsConsecutiveWithoutPause,
+  findMatchingBlockRule,
+  getSlotCoordinates,
+  isBlockSubject,
+} from '../rules';
 import { Planning, ScheduleData } from '../rules/types';
 import { SolverConfig } from './types';
 
@@ -203,35 +208,80 @@ export function buildLpModel(
       constraints.push(`link_block_u${uIdx}_s${s}: ${linkTerms.join(' ')} = 0`);
     }
 
+    const subjectLimit = config.maxHeuresParJourParMatiere?.[prof.matiere] ?? config.maxHeuresParJourUnite ?? 2;
+
     // Somme des z = h modulo 2
+    // En mode relâché, ou si la matière autorise 3h/jour, ou si toutesMatieresABlocs est désactivé,
+    // on n'impose pas une égalité stricte z = h % 2 afin d'éviter l'infaisabilité MIP.
     const zTarget = unite.heures % 2;
-    if (zVarsForUnit.length > 0) {
+    if (zVarsForUnit.length > 0 && !config.relaxedMode && subjectLimit !== 3 && config.toutesMatieresABlocs !== false) {
       constraints.push(`z_sum_u${uIdx}: ${zVarsForUnit.join(' + ')} = ${zTarget}`);
     }
 
-    // Au plus 2h par jour (dur pour matière à blocs)
+    if (subjectLimit === 1) {
+      // Pour une matière limitée à 1h par séance/jour, pas de blocs de 2h
+      continue;
+    }
+
+    const classesNiveaux = unite.classeIds
+      .map((cid) => classMap.get(cid)?.niveau || '')
+      .filter(Boolean)
+      .join(' / ');
+    const matchingRule = findMatchingBlockRule(
+      prof.matiere,
+      classesNiveaux,
+      unite.heures,
+      config.subjectBlockRules
+    );
+
+    const maxDurForUnit =
+      matchingRule && matchingRule.possibilites.length > 0
+        ? Math.min(3, Math.max(1, ...matchingRule.possibilites.map((p) => Math.max(...p))))
+        : subjectLimit;
+
+    // Au plus maxDurForUnit h par jour (dur pour matière à blocs)
     for (let j = 0; j < semaine.jours.length; j++) {
       const daySlots = validSlots.filter((s) => getSlotCoordinates(s, semaine).jourIndex === j);
-      if (daySlots.length > 2) {
+      if (daySlots.length > maxDurForUnit) {
         const dayXTerms = daySlots.map((s) => xVarName(uIdx, s)).join(' + ');
-        constraints.push(`max2h_dur_u${uIdx}_j${j}: ${dayXTerms} <= 2`);
+        constraints.push(`max_dur_u${uIdx}_j${j}: ${dayXTerms} <= ${maxDurForUnit}`);
       }
     }
   }
 
   // Contraintes souples :
-  // (A) Dépassement de 2h/jour : sum(s in j) x[u, s] - e[u, j] <= 2
+  // (A) Dépassement de maxDur/jour : sum(s in j) x[u, s] - e[u, j] <= maxDur
   // (B) Heures non consécutives : pour tout triplet s1 < k < s2 le même jour,
   //     x[u, s1] - x[u, k] + x[u, s2] - nc[u, j] <= 1
   for (let uIdx = 0; uIdx < unites.length; uIdx++) {
     const validSlots = validSlotsPerUnit.get(uIdx) || [];
+    const unitProf = teacherMap.get(unites[uIdx].teacherId);
+    const uClassesNiveaux = unites[uIdx].classeIds
+      .map((cid) => classMap.get(cid)?.niveau || '')
+      .filter(Boolean)
+      .join(' / ');
+    const uMatchingRule = unitProf
+      ? findMatchingBlockRule(
+          unitProf.matiere,
+          uClassesNiveaux,
+          unites[uIdx].heures,
+          config.subjectBlockRules
+        )
+      : undefined;
+    const uSubjectLimit = (unitProf && config.maxHeuresParJourParMatiere?.[unitProf.matiere])
+      ?? config.maxHeuresParJourUnite
+      ?? 2;
+    const uMaxDur =
+      uMatchingRule && uMatchingRule.possibilites.length > 0
+        ? Math.min(3, Math.max(1, ...uMatchingRule.possibilites.map((p) => Math.max(...p))))
+        : uSubjectLimit;
 
     for (let j = 0; j < semaine.jours.length; j++) {
       const daySlots = validSlots.filter((s) => getSlotCoordinates(s, semaine).jourIndex === j);
 
-      if (daySlots.length > 2) {
+      if (daySlots.length > uMaxDur) {
         const dayXTerms = daySlots.map((s) => xVarName(uIdx, s)).join(' + ');
-        constraints.push(`soft_excess_u${uIdx}_j${j}: ${dayXTerms} - ${eVarName(uIdx, j)} <= 2`);
+        constraints.push(`soft_excess_u${uIdx}_j${j}: ${dayXTerms} - ${eVarName(uIdx, j)} <= ${uMaxDur}`);
       }
 
       // Non-consécutif : détection de trou

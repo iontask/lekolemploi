@@ -30,7 +30,8 @@ import {
   setActiveDatasetId,
 } from '../services/db';
 import { exportProjectToJson, parseProjectFromJson } from '../utils/projectJsonIO';
-import { buildOfficialSampleDataset } from '../services/sampleData';
+import { buildOfficialSampleDataset, SamplePreset } from '../services/sampleData';
+import { SampleDatasetsDropdown } from './SampleDatasetsDropdown';
 
 interface ProjectManagerModalProps {
   isOpen: boolean;
@@ -150,6 +151,19 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
     }
   };
 
+  const handleLoadPreset = async (preset: SamplePreset) => {
+    try {
+      const ds = preset.load();
+      await saveActiveDataset(ds);
+      await loadProjects();
+      onSelectProject(ds);
+      onShowToast(`Projet « ${ds.fileName} » chargé avec succès.`, 'success');
+      onClose();
+    } catch (err: any) {
+      onShowToast(err?.message || 'Erreur lors du chargement de l\'exemple.', 'error');
+    }
+  };
+
   const handleJsonUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -202,20 +216,27 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
 
         {/* Action bar */}
         <div className="px-6 py-3 bg-white border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Dropdown Exemples aSc Timetables & Référence */}
+            <SampleDatasetsDropdown
+              variant="navbar"
+              onSelectPreset={handleLoadPreset}
+              isLoading={isLoading}
+            />
+
             <button
               onClick={handleCreateDemo}
-              className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 shadow-xs hover:shadow transition-all"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 shadow-xs hover:shadow transition-all"
             >
-              <Sparkles className="w-4 h-4" />
-              Nouveau projet de référence (360 h)
+              <Sparkles className="w-3.5 h-3.5" />
+              Nouveau projet 360 h
             </button>
 
             <button
               onClick={() => jsonFileInputRef.current?.click()}
-              className="inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 shadow-xs transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 shadow-xs transition-colors"
             >
-              <Upload className="w-4 h-4 text-slate-500" />
+              <Upload className="w-3.5 h-3.5 text-slate-500" />
               Importer JSON
             </button>
             <input

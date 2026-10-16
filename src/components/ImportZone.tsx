@@ -15,10 +15,13 @@ import {
 } from 'lucide-react';
 import { MappingConfig } from '../types';
 import { generateAndDownloadExcel } from '../services/excelGenerator';
+import { SampleDatasetsDropdown } from './SampleDatasetsDropdown';
+import { SAMPLE_PRESETS, SamplePreset } from '../services/sampleData';
 
 interface ImportZoneProps {
   onFileLoaded: (file: File) => Promise<void>;
   onLoadOfficialDemo: () => void;
+  onSelectSamplePreset?: (preset: SamplePreset) => void;
   onOpenMapping: () => void;
   config: MappingConfig;
   isLoading: boolean;
@@ -28,6 +31,7 @@ interface ImportZoneProps {
 export const ImportZone: React.FC<ImportZoneProps> = ({
   onFileLoaded,
   onLoadOfficialDemo,
+  onSelectSamplePreset,
   onOpenMapping,
   config,
   isLoading,
@@ -141,33 +145,44 @@ export const ImportZone: React.FC<ImportZoneProps> = ({
         </div>
       </div>
 
-      {/* Actions rapides : Démo officielle & Modèles téléchargeables */}
+      {/* Actions rapides : Exemples aSc Timetables & Modèles téléchargeables */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Carte Démonstration officielle */}
+        {/* Carte Exemples d'emplois du temps (aSc Timetables & Référence) */}
         <div className="p-5 bg-white rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between space-y-4">
           <div className="space-y-1.5">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-slate-900">
-                Jeu de test officiel (Exemple réel)
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-semibold text-slate-900 flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-amber-500" />
+                Exemples d'emplois du temps & aSc
+              </span>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                aSc Timetables Ready
               </span>
             </div>
             <p className="text-xs text-slate-600 leading-relaxed">
-              Charge instantanément la configuration complète avec <strong>28 enseignants</strong>,{' '}
-              <strong>12 classes</strong> (1APIC-1 à 2BACSE), <strong>360 heures</strong> exactes et
-              cours communs fusionnés.
+              Chargez directement les <strong>outputs du logiciel aSc Timetables</strong> (384 h, 12 classes, 29 profs, avec 381 h placées et bac interactif de cours non affectés) ou le <strong>modèle officiel (360 h)</strong> pour tester et modifier les plannings.
             </p>
           </div>
 
-          <div className="pt-2 flex items-center gap-2">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onLoadOfficialDemo();
-              }}
-              className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-lg transition-colors shadow-xs"
-            >
-              <span>Charger les données de test (360 h)</span>
-            </button>
+          <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+            {onSelectSamplePreset ? (
+              <SampleDatasetsDropdown
+                variant="prominent"
+                onSelectPreset={onSelectSamplePreset}
+                isLoading={isLoading}
+                className="w-full"
+              />
+            ) : (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onLoadOfficialDemo();
+                }}
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-lg transition-colors shadow-xs"
+              >
+                <span>Charger les données de test (360 h)</span>
+              </button>
+            )}
           </div>
         </div>
 

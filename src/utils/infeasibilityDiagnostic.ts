@@ -4,7 +4,12 @@
  */
 
 import { Classe, Teacher, Unite } from '../types';
-import { DEFAULT_RULES_OPTIONS, getSlotCoordinates, isBlockSubject } from '../rules';
+import {
+  DEFAULT_RULES_OPTIONS,
+  findMatchingBlockRule,
+  getSlotCoordinates,
+  isBlockSubject,
+} from '../rules';
 import { RulesOptions, ScheduleData } from '../rules/types';
 import { InfeasibilityDiagnostic, PartialLevelWarning } from '../types/scenarios';
 
@@ -295,10 +300,29 @@ export function buildInfeasibilityReport(
       .map(([jour, count]) => `${count} h le ${jour}`)
       .join(', ');
 
+    const classesNiveaux = unite.classeIds
+      .map((cid) => {
+        const c = data.classes.find((cls) => cls.id === cid);
+        return c?.niveau || '';
+      })
+      .filter(Boolean)
+      .join(' / ');
+    const matchingRule = findMatchingBlockRule(
+      prof.matiere,
+      classesNiveaux,
+      unite.heures,
+      options.subjectBlockRules
+    );
     const estBloc = isBlockSubject(prof.matiere, options.matieresABlocs || ['Arabe', 'Anglais']);
+    const blocInfo =
+      matchingRule && matchingRule.possibilites.length > 0
+        ? `, blocs configurés : ${matchingRule.possibilites.map((p) => p.join('h+')).join(' | ')} (max 3h)`
+        : estBloc
+        ? ', contrainte de blocs 2h consécutives active'
+        : '';
 
     reports.push(
-      `« ${prof.nom} : ${unite.heures} h de ${prof.matiere} en ${classesNoms} pour ${dispoSlots.length} créneaux dispo (${joursDetails})${estBloc ? ', contrainte de blocs 2h consécutives active' : ''} »`
+      `« ${prof.nom} : ${unite.heures} h de ${prof.matiere} en ${classesNoms} pour ${dispoSlots.length} créneaux dispo (${joursDetails})${blocInfo} »`
     );
   }
 
