@@ -2,23 +2,46 @@
 
 @media print {
   @page {
-    size: landscape;
-    margin: 8mm;
+    size: A4 landscape;
+    margin: 6mm 8mm;
   }
 
+  html,
   body {
     background-color: #ffffff !important;
     color: #0f172a !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
 
+  #root,
+  main,
+  div[class*="max-w-"] {
+    max-width: 100% !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* Cacher tous les éléments interactifs et périphériques */
   header,
   footer,
-  .print\:hidden {
+  nav,
+  aside,
+  button,
+  .print\:hidden,
+  [data-print-ignore="true"] {
     display: none !important;
   }
 
+  /* Rendre visibles les titres et éléments dédiés à l'impression */
   .print\:block {
     display: block !important;
   }
@@ -31,9 +54,21 @@
     border-color: #cbd5e1 !important;
   }
 
+  /* Assurer que les conteneurs avec scrollbar s'étalent sur la page paysage */
+  .overflow-x-auto,
+  .overflow-y-auto,
+  .overflow-hidden {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+
+  /* Tableaux & Grilles d'emploi du temps */
   table {
+    width: 100% !important;
     page-break-inside: auto;
-    font-size: 9px !important;
+    font-size: 8.5px !important;
+    border-collapse: collapse !important;
   }
 
   tr {
@@ -43,6 +78,13 @@
 
   th,
   td {
-    padding: 3px 4px !important;
+    padding: 2.5px 3.5px !important;
+    word-break: break-word;
+  }
+
+  /* Éviter les coupures intempestives */
+  .break-inside-avoid {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
   }
 }

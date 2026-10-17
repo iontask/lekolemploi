@@ -81,14 +81,14 @@ export const DraggableCourseCard: React.FC<DraggableCourseCardProps> = ({
       <div className="flex items-center justify-between gap-1">
         <div className="flex items-center gap-1 min-w-0" {...(isLocked ? {} : listeners)} {...(isLocked ? {} : attributes)}>
           {!isLocked && (
-            <GripVertical className="w-3 h-3 text-slate-400 group-hover:text-slate-700 shrink-0 opacity-40 group-hover:opacity-100 transition-opacity" />
+            <GripVertical className="w-3 h-3 text-slate-400 group-hover:text-slate-700 shrink-0 opacity-40 group-hover:opacity-100 transition-opacity print:hidden" />
           )}
           <span className="font-bold truncate text-[11px] leading-tight">{subject}</span>
         </div>
 
         <div className="flex items-center gap-0.5 shrink-0">
           {isSelected && (
-            <span className="text-[9px] font-bold px-1 py-0.2 rounded bg-blue-600 text-white uppercase animate-pulse">
+            <span className="text-[9px] font-bold px-1 py-0.2 rounded bg-blue-600 text-white uppercase animate-pulse print:hidden">
               🎯
             </span>
           )}
@@ -112,7 +112,7 @@ export const DraggableCourseCard: React.FC<DraggableCourseCardProps> = ({
               onToggleLock();
             }}
             title={isLocked ? 'Cours verrouillé (ne sera déplacé ni manuellement ni par le solveur). Cliquez pour déverrouiller.' : 'Verrouiller ce cours (le solveur et le glisser-déposer le garderont fixe).'}
-            className={`p-0.5 rounded transition-colors ${
+            className={`p-0.5 rounded transition-colors print:hidden ${
               isLocked
                 ? 'text-amber-700 hover:text-amber-900 bg-amber-100'
                 : 'text-slate-400 hover:text-slate-700 opacity-60 group-hover:opacity-100'

@@ -23,7 +23,8 @@ import {
   getBlockSlotsForAssignment,
   getLockKey,
 } from '../../utils/dndRulesHelper';
-import { Lock, Unlock, GripVertical } from 'lucide-react';
+import { Lock, Unlock, GripVertical, Printer } from 'lucide-react';
+import { triggerSafeBrowserPrint } from '../../services/pdfExportService';
 
 interface SubjectViewProps {
   dataset: ImportDataset;
@@ -175,6 +176,16 @@ export const SubjectView: React.FC<SubjectViewProps> = ({
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
               Glisser-déposer actif
             </span>
+
+            {/* Imprimer via navigateur */}
+            <button
+              onClick={() => triggerSafeBrowserPrint()}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg transition-colors shadow-2xs ml-1"
+              title="Imprimer cette vue au format paysage"
+            >
+              <Printer className="w-3.5 h-3.5 text-slate-600" />
+              <span>Imprimer</span>
+            </button>
           </div>
         </div>
 
@@ -210,15 +221,18 @@ export const SubjectView: React.FC<SubjectViewProps> = ({
         )}
 
         {/* Titre pour impression */}
-        <div className="hidden print:block text-center pb-2">
-          <h2 className="text-base font-bold text-slate-900">
+        <div className="hidden print:block text-center pb-3">
+          <h2 className="text-base font-bold text-slate-900 tracking-tight">
             GRILLE D'ENSEIGNEMENT PAR MATIÈRE · {selectedSubject.toUpperCase()} ({subjectTeachers.length} ENSEIGNANTS)
           </h2>
+          <p className="text-xs text-slate-600 mt-0.5">
+            Répartition des cours et disponibilités · Format Paysage A4 · Pause méridienne 12h30-13h30
+          </p>
         </div>
 
         {/* Grille : Profs de la matière x 32 Créneaux */}
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs print:shadow-none print:border-slate-300">
-          <div className="overflow-x-auto">
+        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs print:shadow-none print:border-slate-300 print:w-full">
+          <div className="overflow-x-auto print:overflow-visible">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 {/* Ligne 1 : Jours */}

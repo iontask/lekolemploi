@@ -38,7 +38,14 @@ import {
   Clock,
   Inbox,
   ArrowDownToLine,
+  FileDown,
+  Printer,
 } from 'lucide-react';
+import {
+  downloadClassTimetablePDF,
+  downloadTeacherTimetablePDF,
+  triggerSafeBrowserPrint,
+} from '../../services/pdfExportService';
 
 interface ClassTeacherViewProps {
   dataset: ImportDataset;
@@ -465,14 +472,50 @@ export const ClassTeacherView: React.FC<ClassTeacherViewProps> = ({
             )}
           </div>
 
-          <div className="flex items-center gap-4 text-xs text-slate-500 font-medium">
-            <span>
+          <div className="flex flex-wrap items-center gap-2.5 text-xs">
+            <span className="text-slate-500 font-medium">
               <strong className="text-slate-900 font-mono">{relevantAffs.length} h</strong> affectées
             </span>
-            <div className="flex items-center gap-1.5 text-[11px] text-slate-500 bg-slate-50 px-2.5 py-1 rounded-md border border-slate-200">
+
+            <div className="flex items-center gap-1.5 text-[11px] text-slate-500 bg-slate-50 px-2 py-1 rounded-md border border-slate-200">
               <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse" />
               <span>Clic ou glisser pour échanger</span>
             </div>
+
+            {/* Télécharger PDF Paysage */}
+            <button
+              onClick={() => {
+                if (mode === 'class') {
+                  downloadClassTimetablePDF(dataset, planning, selectedClassId);
+                } else {
+                  downloadTeacherTimetablePDF(dataset, planning, selectedTeacherId);
+                }
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg transition-colors shadow-2xs"
+              title="Télécharger l'emploi du temps en PDF format paysage A4"
+            >
+              <FileDown className="w-3.5 h-3.5" />
+              <span>PDF Paysage</span>
+            </button>
+
+            {/* Imprimer via navigateur */}
+            <button
+              onClick={() => {
+                const res = triggerSafeBrowserPrint();
+                if (!res.success) {
+                  if (mode === 'class') {
+                    downloadClassTimetablePDF(dataset, planning, selectedClassId);
+                  } else {
+                    downloadTeacherTimetablePDF(dataset, planning, selectedTeacherId);
+                  }
+                }
+              }}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg transition-colors shadow-2xs"
+              title="Imprimer directement"
+            >
+              <Printer className="w-3.5 h-3.5 text-slate-600" />
+              <span>Imprimer</span>
+            </button>
           </div>
         </div>
 
@@ -601,17 +644,20 @@ export const ClassTeacherView: React.FC<ClassTeacherViewProps> = ({
           contextLabel={mode === 'class' ? `Classe ${selectedClass?.nom || ''}` : `${selectedTeacher?.nom || ''}`}
         />
 
-        {/* Titre d'impression */}
-        <div className="hidden print:block text-center pb-2">
-          <h2 className="text-base font-bold text-slate-900">
-            EMPLOI DU TEMPS · {mode === 'class' ? `CLASSE ${selectedClass?.nom}` : `${selectedTeacher?.nom} (${selectedTeacher?.matiere})`}
+        {/* Titre d'impression paysage */}
+        <div className="hidden print:block text-center pb-3">
+          <h2 className="text-lg font-bold text-slate-900 tracking-tight">
+            EMPLOI DU TEMPS · {mode === 'class' ? `CLASSE : ${selectedClass?.nom} (${selectedClass?.niveau})` : `PROFESSEUR : ${selectedTeacher?.nom} (${selectedTeacher?.matiere})`}
           </h2>
+          <p className="text-xs text-slate-600 mt-0.5">
+            Établissement scolaire · Format Paysage A4 · {relevantAffs.length} h planifiées · Pause méridienne 12h30-13h30
+          </p>
         </div>
 
         {/* Grille Jours x Créneaux */}
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs print:shadow-none print:border-slate-300">
-          <div className="overflow-x-auto">
-            <div className="min-w-[760px]">
+        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs print:shadow-none print:border-slate-300 print:w-full">
+          <div className="overflow-x-auto print:overflow-visible">
+            <div className="min-w-[760px] print:min-w-0 print:w-full">
               {/* En-tête des jours */}
               <div className="grid grid-cols-5 border-b border-slate-200 bg-slate-50 text-xs font-bold text-slate-700">
                 {semaine.jours.map((jour, jIdx) => (

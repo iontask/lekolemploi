@@ -100,7 +100,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   ];
 
   return (
-    <header className="sticky top-0 z-30 bg-white border-b border-slate-200 shadow-2xs">
+    <header className="sticky top-0 z-30 bg-white border-b border-slate-200 shadow-2xs print:hidden">
       {/* Ligne 1 : Logo, Projets, Exemples aSc, Sauvegarde & Actions globales */}
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between gap-2 sm:gap-4 h-14">

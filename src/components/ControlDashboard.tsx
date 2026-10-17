@@ -158,7 +158,7 @@ export const ControlDashboard: React.FC<ControlDashboardProps> = ({
   // Si l'utilisateur est sur l'emploi du temps
   if (activeTab === 'timetable' && dataset.planning) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 print:max-w-none print:w-full print:p-0 print:m-0">
         <TimetableGrid
           dataset={dataset}
           planning={dataset.planning}

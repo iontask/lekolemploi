@@ -12,7 +12,11 @@ import {
   getSubjectMeta,
   SUBJECT_DEFINITIONS,
 } from '../../utils/subjectFormatters';
-import { Search, Info } from 'lucide-react';
+import { Search, Info, FileDown, Printer } from 'lucide-react';
+import {
+  downloadAscMatrixPDF,
+  triggerSafeBrowserPrint,
+} from '../../services/pdfExportService';
 
 interface ClassesAscMatrixViewProps {
   dataset: ImportDataset;
@@ -62,16 +66,42 @@ export const ClassesAscMatrixView: React.FC<ClassesAscMatrixViewProps> = ({
           />
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
           <button
             onClick={() => setShowLegend(!showLegend)}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
           >
             <Info className="w-3.5 h-3.5" />
-            <span>{showLegend ? 'Masquer la légende' : 'Afficher la légende'}</span>
+            <span>{showLegend ? 'Masquer la légende' : 'Légende'}</span>
           </button>
+
+          {/* Télécharger PDF Paysage */}
+          <button
+            onClick={() => downloadAscMatrixPDF(dataset, planning)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-lg transition-colors shadow-2xs"
+            title="Télécharger la matrice globale au format PDF Paysage A4"
+          >
+            <FileDown className="w-3.5 h-3.5" />
+            <span>PDF Matrice (Paysage)</span>
+          </button>
+
+          {/* Imprimer via navigateur */}
+          <button
+            onClick={() => {
+              const res = triggerSafeBrowserPrint();
+              if (!res.success) {
+                downloadAscMatrixPDF(dataset, planning);
+              }
+            }}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg transition-colors shadow-2xs"
+            title="Imprimer directement"
+          >
+            <Printer className="w-3.5 h-3.5 text-slate-600" />
+            <span>Imprimer</span>
+          </button>
+
           <span className="text-xs text-slate-500 font-mono">
-            {filteredClasses.length} classe(s) affichée(s)
+            {filteredClasses.length} classe(s)
           </span>
         </div>
       </div>
@@ -100,15 +130,18 @@ export const ClassesAscMatrixView: React.FC<ClassesAscMatrixViewProps> = ({
       )}
 
       {/* Titre pour impression */}
-      <div className="hidden print:block text-center pb-2">
-        <h2 className="text-base font-bold text-slate-900">
+      <div className="hidden print:block text-center pb-3">
+        <h2 className="text-base font-bold text-slate-900 tracking-tight">
           VUE D'ENSEMBLE DES CLASSES · STYLE aSc HORAIRES ({classes.length} CLASSES · 32 CRÉNEAUX)
         </h2>
+        <p className="text-xs text-slate-600 mt-0.5">
+          Matrice globale hebdomadaire · Format Paysage A4 · Coupure de midi C4/C5 · Vendredi après-midi libéré
+        </p>
       </div>
 
       {/* Tableau matrice aSc Horaires */}
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs print:shadow-none print:border-slate-300">
-        <div className="overflow-x-auto">
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs print:shadow-none print:border-slate-300 print:w-full">
+        <div className="overflow-x-auto print:overflow-visible">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
               {/* Ligne 1 : Jours */}

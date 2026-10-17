@@ -39,7 +39,9 @@ import {
   ShieldAlert,
   ChevronDown,
   ChevronUp,
+  FileDown,
 } from 'lucide-react';
+import { PrintPdfModal } from './PrintPdfModal';
 
 interface TimetableGridProps {
   dataset: ImportDataset;
@@ -61,6 +63,7 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
   const [activeSubView, setActiveSubView] = useState<
     'asc' | 'individual' | 'subject' | 'teachers_matrix' | 'exceptions'
   >('individual');
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
 
   // --- HISTORIQUE ANNULER / RÉTABLIR ILLIMITÉ ---
   const [history, setHistory] = useState<Planning[]>([initialPlanning]);
@@ -483,14 +486,14 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
             <span>{isExportingExcel ? 'Export...' : 'Excel'}</span>
           </button>
 
-          {/* Impression PDF paysage */}
+          {/* Impression PDF paysage & Livrets */}
           <button
-            onClick={() => window.print()}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg transition-colors shadow-2xs"
-            title="Imprime la vue active au format paysage"
+            onClick={() => setIsPrintModalOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-indigo-700 bg-indigo-50/80 hover:bg-indigo-100 border border-indigo-200 rounded-lg transition-colors shadow-2xs"
+            title="Exporter en PDF au format paysage ou imprimer directement"
           >
-            <Printer className="w-3.5 h-3.5 text-slate-600" />
-            <span>Imprimer</span>
+            <Printer className="w-3.5 h-3.5 text-indigo-600" />
+            <span>Imprimer / PDF Paysage</span>
           </button>
 
           {/* Solveur complet */}
@@ -782,6 +785,15 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
           </div>
         )}
       </div>
+
+      {/* Modal d'exportation et impression PDF paysage */}
+      <PrintPdfModal
+        isOpen={isPrintModalOpen}
+        onClose={() => setIsPrintModalOpen(false)}
+        dataset={dataset}
+        planning={currentPlanning}
+        activeSubView={activeSubView}
+      />
     </div>
   );
 };
