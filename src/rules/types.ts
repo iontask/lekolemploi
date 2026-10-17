@@ -76,8 +76,11 @@ export interface SubjectLevelBlockRule {
   id: string;
   matiere: string; // Ex: 'Mathématiques', 'Physique-Chimie', ou '*' (Toutes)
   niveau: string; // Ex: '2BAC', '1BAC', 'TCSF', '3APIC', '2APIC', '1APIC', ou '*' (Tous)
+  classeId?: string; // Spécifique à une classe précise (ou '*' / absent pour tout le niveau)
+  classeNom?: string; // Nom de la classe pour affichage
   heuresHebdo: number; // Volume horaire hebdomadaire (ex: 7)
   possibilites: number[][]; // Ex: [[2, 2, 2, 1], [3, 3, 1], [3, 2, 2]] (chacun max 3h)
+  maxHeuresParJour?: 1 | 2 | 3; // Limite journalière associée (optionnelle)
   description?: string;
   actif?: boolean;
 }
@@ -113,10 +116,14 @@ export interface RulesOptions {
   forbiddenSlotsClasses?: ForbiddenSlotPerClass[];
   /** Plages interdites par prof */
   forbiddenSlotsTeachers?: ForbiddenSlotPerTeacher[];
-  /** Configuration des possibilités de blocs par matière / niveau (ex: 7h = 2h+2h+2h+1h ou 3h+3h+1h ou 3h+2h+2h, max 3h) */
+  /** Configuration des possibilités de blocs par matière / niveau / classe (ex: 7h = 2h+2h+2h+1h ou 3h+3h+1h, max 3h) */
   subjectBlockRules?: SubjectLevelBlockRule[];
-  /** Limite maximale d'heures par jour/séance par matière (1h, 2h ou 3h) */
+  /** Limite maximale globale d'heures par jour/séance par matière (1h, 2h ou 3h) */
   maxHeuresParJourParMatiere?: Record<string, 1 | 2 | 3>;
+  /** Limite maximale d'heures par jour/séance par matière et par NIVEAU (clé: `${niveau}::${matiere}`) */
+  maxHeuresParJourParMatiereNiveau?: Record<string, 1 | 2 | 3>;
+  /** Limite maximale d'heures par jour/séance par matière et par CLASSE (clé: `${classeId}::${matiere}`) */
+  maxHeuresParJourParMatiereClasse?: Record<string, 1 | 2 | 3>;
   /** Mode relâché : règles souples assouplies en cas d'infaisabilité */
   relaxedMode?: boolean;
 }

@@ -9,7 +9,7 @@ import {
   getAIConstraintRecommendations,
 } from '../aiRecommendations';
 import { ImportDataset, Semaine, Teacher, Classe, Unite } from '../../types';
-import { Planning, RulesOptions } from '../../rules/types';
+import { Planning, RulesOptions, ScheduleData } from '../../rules/types';
 import { solvePhaseAWithDiagnostics } from '../../solver/phaseA';
 import { DEFAULT_SOLVER_CONFIG } from '../../solver/types';
 
@@ -168,5 +168,69 @@ describe('Service Recommandations IA pour 100 % d\'insertion', () => {
     const analysis = extractUnplacedUnitsDetails(datasetSample, res.planning);
     expect(analysis.insertionRate).toBe(100);
     expect(analysis.missingHours).toBe(0);
+  });
+
+  it('résout les goulots multi-classes grâce aux chaînes d\'éjection pour atteindre 100 %', () => {
+    // 2 classes partageant un cours commun avec prof contraint
+    const clsA: Classe = { id: 'c_A', nom: '1BACSEF', niveau: '1BAC' };
+    const clsB: Classe = { id: 'c_B', nom: '1BACSEG', niveau: '1BAC' };
+
+    const profCommun: Teacher = {
+      id: 'p_commun',
+      nom: 'EL YOUSEFI SAID',
+      matiere: 'Arabe',
+      // Prof disponible sur 8 créneaux répartis (4 le Lundi, 4 le Mardi)
+      dispo: Array.from({ length: 32 }, (_, i) => i < 4 || (i >= 7 && i < 11)),
+    };
+
+    const profA: Teacher = {
+      id: 'p_A',
+      nom: 'Prof A',
+      matiere: 'Mathématiques',
+      dispo: new Array(32).fill(true),
+    };
+
+    const profB: Teacher = {
+      id: 'p_B',
+      nom: 'Prof B',
+      matiere: 'Physique',
+      dispo: new Array(32).fill(true),
+    };
+
+    const uniteCommune: Unite = {
+      id: 'u_commune',
+      teacherId: profCommun.id,
+      classeIds: [clsA.id, clsB.id],
+      heures: 4,
+    };
+
+    const uniteA: Unite = {
+      id: 'u_A',
+      teacherId: profA.id,
+      classeIds: [clsA.id],
+      heures: 4,
+    };
+
+    const uniteB: Unite = {
+      id: 'u_B',
+      teacherId: profB.id,
+      classeIds: [clsB.id],
+      heures: 4,
+    };
+
+    const multiDataset: ScheduleData = {
+      teachers: [profCommun, profA, profB],
+      classes: [clsA, clsB],
+      unites: [uniteCommune, uniteA, uniteB],
+      semaine: semaineStandard,
+    };
+
+    const res = solvePhaseAWithDiagnostics(multiDataset, {
+      ...DEFAULT_SOLVER_CONFIG,
+      relaxedMode: true,
+    });
+
+    // Les 12 heures (4 commune + 4 A + 4 B) doivent toutes être placées à 100%
+    expect(res.planning.length).toBe(12);
   });
 });

@@ -10,6 +10,7 @@ import {
   canPlace,
   findMatchingBlockRule,
   getSlotCoordinates,
+  getSubjectDailyLimit,
   isBlockSubject,
   verify,
 } from '../rules';
@@ -28,6 +29,7 @@ interface SortedUnitInfo {
   classesCount: number;
   isBlock: boolean;
   heures: number;
+  difficultyScore: number;
 }
 
 export interface PhaseAResultWithDiagnostics {
@@ -37,8 +39,143 @@ export interface PhaseAResultWithDiagnostics {
 }
 
 /**
+ * Chaîne d'éjection locale (Kempe Chain / Ejection Swapper)
+ * Permet de libérer les créneaux critiques occupés par des cours plus flexibles
+ * pour insérer les unités contraintes (cours communs multi-classes, profs à forte indisponibilité).
+ */
+function ejectionChainRepair(
+  currentPlanning: Planning,
+  data: ScheduleData,
+  config: SolverConfig,
+  lockedAssignments: Affectation[] = []
+): boolean {
+  const { unites, teachers, semaine } = data;
+  const totalSlots = semaine.creneauxParJour.reduce((a, b) => a + b, 0);
+  const lockedKeys = new Set(lockedAssignments.map((l) => `${l.uniteId}_${l.slot}`));
+  let placedAny = false;
+
+  // Itérer jusqu'à 30 passes de réparation
+  for (let pass = 0; pass < 30; pass++) {
+    let placedInPass = false;
+
+    // Trouver toutes les unités ayant encore des heures manquantes
+    for (const unite of unites) {
+      const placedCount = currentPlanning.filter((a) => a.uniteId === unite.id).length;
+      if (placedCount >= unite.heures) continue;
+
+      const teacher = teachers.find((t) => t.id === unite.teacherId);
+      if (!teacher) continue;
+
+      // Parcourir tous les créneaux où l'enseignant est libre et disponible
+      for (let s = 0; s < totalSlots; s++) {
+        if (!teacher.dispo[s]) continue;
+
+        // Le prof est-il déjà en cours sur ce créneau ?
+        const profCourse = currentPlanning.find((a) => {
+          if (a.slot !== s) return false;
+          const u = unites.find((unt) => unt.id === a.uniteId);
+          return u && u.teacherId === unite.teacherId;
+        });
+        if (profCourse) continue;
+
+        // Quelles affectations occupent les classes de cette unité sur ce créneau ?
+        const conflictingAffs = currentPlanning.filter((a) => {
+          if (a.slot !== s) return false;
+          const u = unites.find((unt) => unt.id === a.uniteId);
+          return u && u.classeIds.some((cid) => unite.classeIds.includes(cid));
+        });
+
+        // Cas 1 : Aucune classe en conflit -> insertion directe si valide
+        if (conflictingAffs.length === 0) {
+          if (canPlace(currentPlanning, unite, s, data, config).ok) {
+            currentPlanning.push({ uniteId: unite.id, slot: s });
+            placedInPass = true;
+            placedAny = true;
+            break;
+          }
+          continue;
+        }
+
+        // Cas 2 : 1 ou 2 unités bloquantes
+        if (conflictingAffs.length <= 2) {
+          // Si l'une des unités bloquantes est verrouillée, abandonner ce créneau
+          if (conflictingAffs.some((a) => lockedKeys.has(`${a.uniteId}_${a.slot}`))) {
+            continue;
+          }
+
+          // Retirer temporairement les unités bloquantes
+          const tempPlanning = currentPlanning.filter(
+            (a) => !conflictingAffs.some((ca) => ca.uniteId === a.uniteId && ca.slot === a.slot)
+          );
+
+          // Vérifier si `unite` peut se placer sur le créneau libéré
+          const canPlaceTarget = canPlace(tempPlanning, unite, s, data, config);
+          if (!canPlaceTarget.ok) continue;
+
+          // Ajouter `unite` sur `s`
+          const planningWithTarget = [...tempPlanning, { uniteId: unite.id, slot: s }];
+
+          // Chercher un créneau de relogement pour chaque unité bloquante
+          const relocations: { uniteId: string; oldSlot: number; newSlot: number }[] = [];
+          let allRelocated = true;
+
+          for (const confAff of conflictingAffs) {
+            const confUnite = unites.find((u) => u.id === confAff.uniteId);
+            if (!confUnite) {
+              allRelocated = false;
+              break;
+            }
+
+            let altSlotFound = -1;
+            for (let alt = 0; alt < totalSlots; alt++) {
+              if (alt === s) continue;
+              if (canPlace(planningWithTarget, confUnite, alt, data, config).ok) {
+                altSlotFound = alt;
+                planningWithTarget.push({ uniteId: confUnite.id, slot: alt });
+                break;
+              }
+            }
+
+            if (altSlotFound !== -1) {
+              relocations.push({
+                uniteId: confAff.uniteId,
+                oldSlot: confAff.slot,
+                newSlot: altSlotFound,
+              });
+            } else {
+              allRelocated = false;
+              break;
+            }
+          }
+
+          if (allRelocated) {
+            // Relogement validé avec succès !
+            for (const rel of relocations) {
+              const idx = currentPlanning.findIndex(
+                (a) => a.uniteId === rel.uniteId && a.slot === rel.oldSlot
+              );
+              if (idx >= 0) {
+                currentPlanning[idx].slot = rel.newSlot;
+              }
+            }
+            currentPlanning.push({ uniteId: unite.id, slot: s });
+            placedInPass = true;
+            placedAny = true;
+            break;
+          }
+        }
+      }
+    }
+
+    if (!placedInPass) break;
+  }
+
+  return placedAny;
+}
+
+/**
  * Phase A : Heuristique constructive « Difficiles d'abord » avec backtracking borné,
- * passes adaptatives et diagnostic temps réel des goulots d'étranglement.
+ * passes adaptatives, chaînes d'éjection et diagnostic temps réel des goulots d'étranglement.
  */
 export function solvePhaseAWithDiagnostics(
   data: ScheduleData,
@@ -121,11 +258,21 @@ export function solvePhaseAWithDiagnostics(
     });
   }
 
-  // 2. Préparation et tri des unités par difficulté
+  // 2. Préparation et tri des unités par difficulté réelle (MRV / Criticité)
   const unitInfos: SortedUnitInfo[] = unites.map((unite) => {
     const teacher = teachers.find((t) => t.id === unite.teacherId)!;
     const margin = teacherMarginMap.get(unite.teacherId) ?? 99;
     const isBlock = isBlockSubject(teacher.matiere, config.matieresABlocs, config.toutesMatieresABlocs !== false);
+    const dispos = teacher.dispo.filter(Boolean).length;
+
+    // Calcul de la criticité :
+    // 1. Cours communs multi-classes (unite.classeIds.length >= 2) avec peu de créneaux prof sont prioritaires absolus
+    const multiClassScore = unite.classeIds.length >= 2 ? (dispos <= 14 ? 3000 : 1500) : 0;
+    const tightDispoScore = dispos <= 8 ? 1200 : dispos <= 14 ? 600 : dispos <= 20 ? 200 : 0;
+    const marginScore = margin <= 0 ? 1000 : margin <= 1 ? 500 : margin <= 2 ? 250 : 0;
+    const blockScore = isBlock ? 80 : 0;
+    const difficultyScore = multiClassScore + tightDispoScore + marginScore + blockScore + unite.heures;
+
     return {
       unite,
       teacher,
@@ -133,22 +280,12 @@ export function solvePhaseAWithDiagnostics(
       classesCount: unite.classeIds.length,
       isBlock,
       heures: unite.heures,
+      difficultyScore,
     };
   });
 
-  // Tri « Difficiles d'abord » :
-  unitInfos.sort((a, b) => {
-    if (a.teacherMargin !== b.teacherMargin) {
-      return a.teacherMargin - b.teacherMargin;
-    }
-    if (a.classesCount !== b.classesCount) {
-      return b.classesCount - a.classesCount;
-    }
-    if (a.isBlock !== b.isBlock) {
-      return (b.isBlock ? 1 : 0) - (a.isBlock ? 1 : 0);
-    }
-    return b.heures - a.heures;
-  });
+  // Tri par score de difficulté décroissant (les plus contraints en premier)
+  unitInfos.sort((a, b) => b.difficultyScore - a.difficultyScore);
 
   // Décomposition en paires et triplets consécutifs sans franchir la pause
   const validBlockPairs: { slot1: number; slot2: number; jourIndex: number }[] = [];
@@ -191,7 +328,6 @@ export function solvePhaseAWithDiagnostics(
     if (isCancelled && isCancelled()) break;
 
     const currentPlanning: Planning = [...lockedAssignments];
-    let allPlacedInAttempt = true;
 
     if (onProgress && attempt % 5 === 0) {
       const pct = Math.min(48, Math.round((attempt / MAX_RESTARTS) * 45) + 5);
@@ -201,10 +337,11 @@ export function solvePhaseAWithDiagnostics(
     const attemptUnits = [...unitInfos];
     if (attempt > 0) {
       attemptUnits.sort((a, b) => {
-        if (a.teacherMargin === 0 || b.teacherMargin === 0) {
-          return a.teacherMargin - b.teacherMargin;
+        // Conserver les ultra-critiques en tête absolue
+        if (a.difficultyScore >= 2000 || b.difficultyScore >= 2000) {
+          return b.difficultyScore - a.difficultyScore;
         }
-        const diff = a.teacherMargin - b.teacherMargin;
+        const diff = b.difficultyScore - a.difficultyScore;
         if (diff !== 0) return diff;
         return Math.random() - 0.5;
       });
@@ -230,7 +367,8 @@ export function solvePhaseAWithDiagnostics(
         teacher.matiere,
         classesNiveaux,
         unite.heures,
-        config.subjectBlockRules
+        config.subjectBlockRules,
+        unite.classeIds[0]
       );
 
       // (A) Modèle personnalisé avec subjectBlockRules
@@ -238,7 +376,6 @@ export function solvePhaseAWithDiagnostics(
         const chosenPattern = matchingRule.possibilites[attempt % matchingRule.possibilites.length];
         const blocksToPlace = [...chosenPattern].sort((a, b) => b - a);
         const placedDays = new Set<number>();
-        let unitSuccess = true;
 
         for (const bSize of blocksToPlace) {
           if (bSize === 3) {
@@ -258,9 +395,6 @@ export function solvePhaseAWithDiagnostics(
               currentPlanning.push({ uniteId: unite.id, slot: best.slot2 });
               currentPlanning.push({ uniteId: unite.id, slot: best.slot3 });
               placedDays.add(best.jourIndex);
-            } else {
-              unitSuccess = false;
-              break;
             }
           } else if (bSize === 2) {
             const candidatePairs = validBlockPairs.filter((p) => {
@@ -276,9 +410,6 @@ export function solvePhaseAWithDiagnostics(
               currentPlanning.push({ uniteId: unite.id, slot: best.slot1 });
               currentPlanning.push({ uniteId: unite.id, slot: best.slot2 });
               placedDays.add(best.jourIndex);
-            } else {
-              unitSuccess = false;
-              break;
             }
           } else {
             const singleCandidates = Array.from({ length: totalSlots }, (_, i) => i)
@@ -292,24 +423,22 @@ export function solvePhaseAWithDiagnostics(
               const best = singleCandidates[0];
               currentPlanning.push({ uniteId: unite.id, slot: best });
               placedDays.add(getSlotCoordinates(best, semaine).jourIndex);
-            } else {
-              unitSuccess = false;
-              break;
             }
           }
-        }
-
-        if (!unitSuccess) {
-          allPlacedInAttempt = false;
-          // NE PAS abandonner les unités suivantes : continuer !
         }
         continue;
       }
 
-      // (B) Modèle standard ou configuré par matière (1h, 2h ou 3h)
-      const subjectLimit = config.maxHeuresParJourParMatiere?.[teacher.matiere]
-        ?? config.maxHeuresParJourUnite
-        ?? 2;
+      // (B) Modèle standard ou configuré par matière/niveau/classe (1h, 2h ou 3h)
+      const classesNiveauxList = unite.classeIds
+        .map((cid) => classMap.get(cid)?.niveau)
+        .filter(Boolean) as string[];
+      const subjectLimit = getSubjectDailyLimit(
+        teacher.matiere,
+        unite.classeIds,
+        classesNiveauxList,
+        config
+      );
 
       const placedDays = new Set<number>();
       let hoursPlacedForUnit = 0;
@@ -336,7 +465,7 @@ export function solvePhaseAWithDiagnostics(
         }
       }
 
-      // 2. Si la matière est en blocs de 2h (ou reste >= 2h après triplet)
+      // 2. Si la matière est en blocs de 2h
       const currentRemaining = remainingHeures - hoursPlacedForUnit;
       const isStrictBlock = isBlock && subjectLimit >= 2;
       const shouldPreferBlocks =
@@ -421,11 +550,6 @@ export function solvePhaseAWithDiagnostics(
           }
         }
       }
-
-      if (hoursPlacedForUnit < remainingHeures) {
-        allPlacedInAttempt = false;
-        // Continuer vers l'unité suivante pour maximiser l'ensemble !
-      }
     }
 
     // --- PASS 2 : Réparation des heures manquantes de toutes les unités ---
@@ -461,6 +585,17 @@ export function solvePhaseAWithDiagnostics(
       }
     }
 
+    // --- PASS 4 : Chaîne d'éjection locale (Swap / Ejection chain) ---
+    if (currentPlanning.length < totalTargetHours) {
+      ejectionChainRepair(currentPlanning, data, config, lockedAssignments);
+    }
+
+    // --- PASS 5 : Chaîne d'éjection en mode relâché si nécessaire ---
+    if (config.relaxedMode && currentPlanning.length < totalTargetHours) {
+      const relaxedOpts = { ...config, relaxedMode: true, respecterPauseMidiBlocs: false };
+      ejectionChainRepair(currentPlanning, data, relaxedOpts, lockedAssignments);
+    }
+
     if (currentPlanning.length > bestPlacedCount) {
       bestPlacedCount = currentPlanning.length;
       bestPlanning = [...currentPlanning];
@@ -485,6 +620,32 @@ export function solvePhaseAWithDiagnostics(
     }
   }
 
+  // --- PASS FINALE D'ÉJECTION GLOBALE SUR LA MEILLEURE SOLUTION ---
+  if (bestPlanning.length < totalTargetHours) {
+    ejectionChainRepair(bestPlanning, data, config, lockedAssignments);
+    if (config.relaxedMode && bestPlanning.length < totalTargetHours) {
+      const relaxedOpts = { ...config, relaxedMode: true, respecterPauseMidiBlocs: false };
+      ejectionChainRepair(bestPlanning, data, relaxedOpts, lockedAssignments);
+    }
+  }
+
+  if (bestPlanning.length === totalTargetHours) {
+    const violations = verify(bestPlanning, data, config);
+    const hardViolations = violations.filter((v) => v.severite === 'DURE');
+    if (hardViolations.length === 0) {
+      addLog(
+        'SUCCESS',
+        `Phase A : Succès à 100 % grâce aux chaînes d'éjection locale (${totalTargetHours} h placées sans conflit).`,
+        'PHASE_A'
+      );
+      return {
+        planning: bestPlanning,
+        logs,
+        bottlenecks: [],
+      };
+    }
+  }
+
   // --- ANALYSE DES GOULOTS D'ÉTRANGLEMENT (Si heures manquantes) ---
   const missingTotal = totalTargetHours - bestPlanning.length;
   if (missingTotal > 0) {
@@ -505,7 +666,6 @@ export function solvePhaseAWithDiagnostics(
       const classesNoms = unite.classeIds.map((cid) => classMap.get(cid)?.nom || cid);
       const matiere = teacher?.matiere || 'Matière inconnue';
 
-      // Tester tous les créneaux pour identifier pourquoi l'unité a été bloquée
       let teacherIndispoCount = 0;
       let classCollisionCount = 0;
       let blockOrPauseCount = 0;
@@ -523,7 +683,6 @@ export function solvePhaseAWithDiagnostics(
         }
       }
 
-      // Déterminer la cause prépondérante
       let bottleneckType = 'BLOCK_CONSTRAINT';
       let primaryCause = `Contrainte de blocs journaliers (${matiere})`;
       let diagnosticExplanation = `La matière « ${matiere} » plafonnée à 2h/jour ne trouve plus de paire consécutive compatible dans les créneaux libres de ${teacher?.nom}.`;
@@ -535,7 +694,7 @@ export function solvePhaseAWithDiagnostics(
         },
       };
 
-      if (teacherIndispoCount > totalSlots * 0.5) {
+      if (teacherIndispoCount > totalSlots * 0.4) {
         bottleneckType = 'TEACHER_DISPO';
         primaryCause = `Indisponibilité forte de l'enseignant ${teacher?.nom}`;
         diagnosticExplanation = `${teacher?.nom} est indisponible sur ${teacherIndispoCount} créneaux. Il n'y a plus de créneaux simultanés disponibles avec les classes ${classesNoms.join(', ')}.`;
@@ -577,7 +736,7 @@ export function solvePhaseAWithDiagnostics(
 
       addLog(
         'BOTTLENECK',
-        `Goulot détecté pour « ${matiere} » (${missing} h manquante(s)) : ${primaryCause}.`,
+        `Goulot détecté pour « ${matiere} » (${missing} h manquante(s)) : ${primaryCause}. - ${diagnosticExplanation}`,
         'PHASE_A',
         diagnosticExplanation,
         bottleneckType as GenerationLogEntry['bottleneckType'],

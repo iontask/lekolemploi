@@ -311,7 +311,8 @@ export function buildInfeasibilityReport(
       prof.matiere,
       classesNiveaux,
       unite.heures,
-      options.subjectBlockRules
+      options.subjectBlockRules,
+      unite.classeIds[0]
     );
     const estBloc = isBlockSubject(prof.matiere, options.matieresABlocs || ['Arabe', 'Anglais']);
     const blocInfo =

@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { ImportDataset, MappingConfig } from './types';
+import { ImportDataset, MappingConfig, Unite } from './types';
 import {
   DEFAULT_MAPPING_CONFIG,
   clearAllData,
@@ -233,11 +233,12 @@ export function App() {
     setIsGenerationOpen(true);
   };
 
-  const handleSaveConstraints = async (newConstraints: RulesOptions) => {
+  const handleSaveConstraints = async (newConstraints: RulesOptions, updatedUnites?: Unite[]) => {
     if (!dataset) return;
     const updatedDataset: ImportDataset = {
       ...dataset,
       constraints: newConstraints,
+      ...(updatedUnites ? { unites: updatedUnites } : {}),
     };
     await persistDataset(updatedDataset);
     addToast('Contraintes enregistrées avec succès.', 'success');

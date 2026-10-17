@@ -27,8 +27,9 @@ import {
   ChevronDown,
   ChevronUp,
   Search,
+  School,
 } from 'lucide-react';
-import { Classe, ImportDataset, Teacher } from '../types';
+import { Classe, ImportDataset, Teacher, Unite } from '../types';
 import {
   DEFAULT_RULES_OPTIONS,
   generatePossibleBlockPartitions,
@@ -41,11 +42,12 @@ import {
   RulesOptions,
   SubjectLevelBlockRule,
 } from '../rules/types';
+import { SubjectHourlyConstraintsManager } from './SubjectHourlyConstraintsManager';
 
 interface ConstraintsPanelProps {
   dataset: ImportDataset;
   currentConstraints?: RulesOptions;
-  onSaveConstraints: (newConstraints: RulesOptions) => void;
+  onSaveConstraints: (newConstraints: RulesOptions, updatedUnites?: Unite[]) => void;
 }
 
 export const ConstraintsPanel: React.FC<ConstraintsPanelProps> = ({
@@ -62,6 +64,31 @@ export const ConstraintsPanel: React.FC<ConstraintsPanelProps> = ({
     ...(dataset.constraints || {}),
     ...(currentConstraints || {}),
   });
+
+  const [unitesList, setUnitesList] = useState<Unite[]>(dataset.unites);
+
+  React.useEffect(() => {
+    setUnitesList(dataset.unites);
+  }, [dataset.unites]);
+
+  const handleUpdateUnitHours = (uniteId: string, newHours: number) => {
+    setUnitesList((prev) =>
+      prev.map((u) => (u.id === uniteId ? { ...u, heures: newHours } : u))
+    );
+  };
+
+  const handleUpdateLevelHours = (niveau: string, matiere: string, newHours: number) => {
+    const teacherMap = new Map(teachers.map((t) => [t.id, t]));
+    const classMap = new Map(classes.map((c) => [c.id, c]));
+    setUnitesList((prev) =>
+      prev.map((u) => {
+        const t = teacherMap.get(u.teacherId);
+        if (!t || t.matiere !== matiere) return u;
+        const inLevel = u.classeIds.some((cid) => classMap.get(cid)?.niveau === niveau);
+        return inLevel ? { ...u, heures: newHours } : u;
+      })
+    );
+  };
 
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -180,6 +207,7 @@ export const ConstraintsPanel: React.FC<ConstraintsPanelProps> = ({
   // Formulaire d'ajout / modification de règle de blocs
   const [ruleMatiere, setRuleMatiere] = useState<string>(allAvailableSubjects[0] || 'Mathématiques');
   const [ruleNiveau, setRuleNiveau] = useState<string>(allLevels[0] || '2BAC');
+  const [ruleClasseId, setRuleClasseId] = useState<string>('*');
   const [ruleHours, setRuleHours] = useState<number>(7);
   const [rulePossibilities, setRulePossibilities] = useState<number[][]>([
     [2, 2, 2, 1],
@@ -188,6 +216,28 @@ export const ConstraintsPanel: React.FC<ConstraintsPanelProps> = ({
   ]);
   const [customDraftBlocks, setCustomDraftBlocks] = useState<number[]>([]);
   const [isAddRuleExpanded, setIsAddRuleExpanded] = useState<boolean>(true);
+
+  const handleNavigateToBlockRule = (
+    matiere: string,
+    niveau: string,
+    classeId?: string,
+    hours?: number
+  ) => {
+    setRuleMatiere(matiere);
+    setRuleNiveau(niveau || allLevels[0] || '*');
+    setRuleClasseId(classeId || '*');
+    if (hours) {
+      setRuleHours(hours);
+      if (hours === 7) {
+        setRulePossibilities([[2, 2, 2, 1], [3, 3, 1], [3, 2, 2]]);
+      } else {
+        setRulePossibilities(generatePossibleBlockPartitions(hours, 3).slice(0, 3));
+      }
+    }
+    setIsAddRuleExpanded(true);
+    const el = document.getElementById('section-block-rules');
+    if (el) el.scrollIntoView({ behavior: 'smooth' });
+  };
 
   // Basculer l'état actif / inactif d'une règle
   const handleToggleRuleActive = (ruleId: string) => {
@@ -271,16 +321,26 @@ export const ConstraintsPanel: React.FC<ConstraintsPanelProps> = ({
   const handleSaveNewBlockRule = () => {
     if (!ruleMatiere || !ruleNiveau || rulePossibilities.length === 0) return;
     const current = options.subjectBlockRules || [];
+    const classMap = new Map(classes.map((c) => [c.id, c]));
+    const targetClass = ruleClasseId && ruleClasseId !== '*' ? classMap.get(ruleClasseId) : undefined;
     const newRule: SubjectLevelBlockRule = {
       id: `rule_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       matiere: ruleMatiere,
       niveau: ruleNiveau,
+      classeId: targetClass ? targetClass.id : undefined,
+      classeNom: targetClass ? targetClass.nom : undefined,
       heuresHebdo: ruleHours,
       possibilites: rulePossibilities,
       actif: true,
     };
     const filtered = current.filter(
-      (r) => !(r.matiere === ruleMatiere && r.niveau === ruleNiveau && r.heuresHebdo === ruleHours)
+      (r) =>
+        !(
+          r.matiere === ruleMatiere &&
+          r.niveau === ruleNiveau &&
+          r.heuresHebdo === ruleHours &&
+          (r.classeId || '*') === (targetClass?.id || '*')
+        )
     );
     setOptions({
       ...options,
@@ -445,13 +505,14 @@ export const ConstraintsPanel: React.FC<ConstraintsPanelProps> = ({
   };
 
   const handleSave = () => {
-    onSaveConstraints(options);
+    onSaveConstraints(options, unitesList);
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 3000);
   };
 
   const handleResetToDefault = () => {
     setOptions({ ...DEFAULT_RULES_OPTIONS });
+    setUnitesList(dataset.unites);
     setShowResetConfirm(false);
   };
 
@@ -582,286 +643,33 @@ export const ConstraintsPanel: React.FC<ConstraintsPanelProps> = ({
             </ul>
           </div>
 
-          {!(options.toutesMatieresABlocs ?? true) && (
-            <div className="p-3.5 bg-amber-50/50 rounded-xl border border-amber-200/70 space-y-2">
-              <p className="text-xs font-semibold text-slate-700">
-                Liste restreinte des matières soumises à la règle stricte des blocs de 2h :
+          {/* GESTION COMPLÈTE DES CONTRAINTES HORAIRES DES MATIÈRES (GLOBAL, PAR NIVEAU ET PAR CLASSE) */}
+          <div className="pt-2 border-t border-slate-100">
+            <div className="mb-3">
+              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                <Clock className="w-4 h-4 text-indigo-600" />
+                Contraintes horaires des matières par Niveau et par Classe
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Ajustez le volume horaire hebdomadaire et le plafond journalier (1h, 2h ou 3h par jour/séance) globalement, par niveau scolaire, ou individuellement pour chaque classe avec héritage clair.
               </p>
-
-              <div className="flex flex-wrap gap-2">
-                {(options.matieresABlocs || ['Arabe', 'Anglais']).map((subj) => (
-                  <span
-                    key={subj}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white border border-indigo-200 rounded-lg text-xs font-semibold text-indigo-900 shadow-2xs"
-                  >
-                    <span>{subj}</span>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveBlockSubject(subj)}
-                      className="hover:text-rose-600 text-indigo-400 p-0.5"
-                      title="Supprimer"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-
-              <div className="flex items-center gap-2 pt-1">
-                <input
-                  type="text"
-                  placeholder="Ajouter une matière (ex: Physique-Chimie, SVT...)"
-                  value={newBlockSubject}
-                  onChange={(e) => setNewBlockSubject(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleAddBlockSubject(newBlockSubject)}
-                  className="flex-1 text-xs px-3 py-1.5 border border-slate-300 rounded-lg bg-white"
-                />
-                <button
-                  type="button"
-                  onClick={() => handleAddBlockSubject(newBlockSubject)}
-                  className="px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-medium hover:bg-slate-800"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-              <div className="text-[11px] text-slate-500 flex flex-wrap gap-1.5 items-center">
-                <span>Suggestions rapides :</span>
-                {allAvailableSubjects
-                  .filter((s) => !(options.matieresABlocs || []).includes(s))
-                  .slice(0, 4)
-                  .map((s) => (
-                    <button
-                      key={s}
-                      type="button"
-                      onClick={() => handleAddBlockSubject(s)}
-                      className="underline hover:text-slate-800 text-slate-600 font-medium"
-                    >
-                      + {s}
-                    </button>
-                  ))}
-              </div>
-            </div>
-          )}
-
-          {/* GRILLE DE FLEXIBILITÉ POUR CHAQUE MATIÈRE (1H, 2H OU 3H PAR SÉANCE / JOUR) */}
-          <div className="space-y-3 pt-2 border-t border-slate-100">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-indigo-600" />
-                  Grille de flexibilité : Maximum par jour / séance pour chaque matière
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Cochez pour chaque matière si elle se limite à <strong>1h par séance/jour</strong>, <strong>2h (standard recommandé)</strong>, ou <strong>3h (séances longues autorisées)</strong>.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <button
-                  type="button"
-                  onClick={() => handleSetAllSubjectsDailyLimit(2)}
-                  className="px-2.5 py-1 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors border border-slate-200 shadow-2xs"
-                  title="Rétablir toutes les matières au standard 2h max par jour"
-                >
-                  Toutes à 2h (Standard)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleSetAllSubjectsDailyLimit(1)}
-                  className="px-2.5 py-1 text-xs font-medium text-amber-800 bg-amber-50 hover:bg-amber-100 rounded-lg transition-colors border border-amber-200"
-                  title="Limiter toutes les matières à 1h par séance"
-                >
-                  Toutes à 1h
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleSetAllSubjectsDailyLimit(3)}
-                  className="px-2.5 py-1 text-xs font-medium text-purple-800 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors border border-purple-200"
-                  title="Autoriser des séances jusqu'à 3h pour toutes les matières"
-                >
-                  Toutes à 3h
-                </button>
-              </div>
             </div>
 
-            {/* Barre de recherche de matière si > 4 matières */}
-            {allAvailableSubjects.length > 4 && (
-              <div className="flex items-center gap-2 max-w-sm">
-                <div className="relative flex-1">
-                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    placeholder="Filtrer une matière..."
-                    value={subjectDailyFilter}
-                    onChange={(e) => setSubjectDailyFilter(e.target.value)}
-                    className="w-full text-xs pl-8 pr-3 py-1.5 border border-slate-300 rounded-lg bg-white"
-                  />
-                </div>
-                {subjectDailyFilter && (
-                  <button
-                    type="button"
-                    onClick={() => setSubjectDailyFilter('')}
-                    className="text-xs text-slate-400 hover:text-slate-600 px-1"
-                  >
-                    Effacer
-                  </button>
-                )}
-              </div>
-            )}
-
-            {/* Tableau / Grille des matières */}
-            <div className="overflow-x-auto rounded-xl border border-slate-200 shadow-2xs">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-50/90 border-b border-slate-200 text-[11px] font-bold text-slate-700 uppercase tracking-wider">
-                    <th className="py-2.5 px-4">Matière</th>
-                    <th className="py-2.5 px-3">Classes & Volume</th>
-                    <th className="py-2.5 px-3 text-center w-36">
-                      <div className="inline-flex items-center gap-1 text-amber-800">
-                        <span>1h max</span>
-                        <span className="text-[9px] font-normal opacity-75">(séance)</span>
-                      </div>
-                    </th>
-                    <th className="py-2.5 px-3 text-center w-36 bg-indigo-50/50">
-                      <div className="inline-flex items-center gap-1 text-indigo-900">
-                        <span>2h max</span>
-                        <span className="text-[9px] font-normal opacity-75">(Standard)</span>
-                      </div>
-                    </th>
-                    <th className="py-2.5 px-3 text-center w-36">
-                      <div className="inline-flex items-center gap-1 text-purple-800">
-                        <span>3h max</span>
-                        <span className="text-[9px] font-normal opacity-75">(longue)</span>
-                      </div>
-                    </th>
-                    <th className="py-2.5 px-4 text-right">Règle active</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-xs">
-                  {filteredSubjects.map((subj) => {
-                    const currentVal = options.maxHeuresParJourParMatiere?.[subj] ?? options.maxHeuresParJourUnite ?? 2;
-                    const meta = subjectMetadata.get(subj);
-
-                    return (
-                      <tr
-                        key={subj}
-                        className={`hover:bg-slate-50/80 transition-colors ${
-                          currentVal === 3
-                            ? 'bg-purple-50/20'
-                            : currentVal === 1
-                            ? 'bg-amber-50/20'
-                            : ''
-                        }`}
-                      >
-                        <td className="py-2.5 px-4 font-semibold text-slate-900">
-                          <div className="flex items-center gap-2">
-                            <BookOpen className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                            <span>{subj}</span>
-                          </div>
-                        </td>
-                        <td className="py-2.5 px-3 text-slate-500 text-[11px]">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            {meta?.totalHours ? (
-                              <span className="font-mono font-bold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded text-[10px]">
-                                {meta.totalHours} h totales
-                              </span>
-                            ) : null}
-                            <span>
-                              {meta?.teachers.length || 0} prof(s) · {meta?.classes.length || 0} classe(s)
-                            </span>
-                          </div>
-                        </td>
-
-                        {/* Option 1h */}
-                        <td className="py-2.5 px-3 text-center">
-                          <label
-                            className={`inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg cursor-pointer border text-xs font-semibold transition-all ${
-                              currentVal === 1
-                                ? 'bg-amber-100 text-amber-900 border-amber-300 shadow-2xs'
-                                : 'bg-white text-slate-600 border-slate-200 hover:border-amber-300 hover:bg-amber-50/40'
-                            }`}
-                          >
-                            <input
-                              type="radio"
-                              name={`limit_${subj}`}
-                              checked={currentVal === 1}
-                              onChange={() => handleSetSubjectDailyLimit(subj, 1)}
-                              className="text-amber-600 focus:ring-amber-500 w-3.5 h-3.5 cursor-pointer"
-                            />
-                            <span>1 heure</span>
-                          </label>
-                        </td>
-
-                        {/* Option 2h (Standard) */}
-                        <td className="py-2.5 px-3 text-center bg-indigo-50/30">
-                          <label
-                            className={`inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg cursor-pointer border text-xs font-semibold transition-all ${
-                              currentVal === 2
-                                ? 'bg-indigo-600 text-white border-indigo-700 shadow-2xs'
-                                : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/40'
-                            }`}
-                          >
-                            <input
-                              type="radio"
-                              name={`limit_${subj}`}
-                              checked={currentVal === 2}
-                              onChange={() => handleSetSubjectDailyLimit(subj, 2)}
-                              className="text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5 cursor-pointer"
-                            />
-                            <span>2 heures</span>
-                          </label>
-                        </td>
-
-                        {/* Option 3h */}
-                        <td className="py-2.5 px-3 text-center">
-                          <label
-                            className={`inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg cursor-pointer border text-xs font-semibold transition-all ${
-                              currentVal === 3
-                                ? 'bg-purple-100 text-purple-900 border-purple-300 shadow-2xs'
-                                : 'bg-white text-slate-600 border-slate-200 hover:border-purple-300 hover:bg-purple-50/40'
-                            }`}
-                          >
-                            <input
-                              type="radio"
-                              name={`limit_${subj}`}
-                              checked={currentVal === 3}
-                              onChange={() => handleSetSubjectDailyLimit(subj, 3)}
-                              className="text-purple-600 focus:ring-purple-500 w-3.5 h-3.5 cursor-pointer"
-                            />
-                            <span>3 heures</span>
-                          </label>
-                        </td>
-
-                        {/* Effet / Résumé */}
-                        <td className="py-2.5 px-4 text-right">
-                          {currentVal === 1 && (
-                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-800 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200">
-                              1h max par séance/jour
-                            </span>
-                          )}
-                          {currentVal === 2 && (
-                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-800 bg-indigo-50 px-2.5 py-1 rounded-full border border-indigo-200">
-                              2h max par jour (Standard)
-                            </span>
-                          )}
-                          {currentVal === 3 && (
-                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-purple-800 bg-purple-50 px-2.5 py-1 rounded-full border border-purple-200">
-                              Séances autorisées jusqu'à 3h
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <SubjectHourlyConstraintsManager
+              teachers={teachers}
+              classes={classes}
+              unites={unitesList}
+              options={options}
+              onChangeOptions={setOptions}
+              onUpdateUnitHours={handleUpdateUnitHours}
+              onUpdateLevelHours={handleUpdateLevelHours}
+              onConfigureBlockRule={handleNavigateToBlockRule}
+            />
           </div>
         </div>
 
-        {/* SECTION 2 : DÉCOUPAGE EN BLOCS PAR MATIÈRE / NIVEAU (POSSIBILITÉS DE BLOCS) */}
-        <div className="col-span-1 lg:col-span-2 p-5 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-5">
+        {/* SECTION 2 : DÉCOUPAGE EN BLOCS PAR MATIÈRE / NIVEAU / CLASSE */}
+        <div id="section-block-rules" className="col-span-1 lg:col-span-2 p-5 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
             <div className="flex items-center gap-2.5">
               <div className="p-1.5 rounded-lg bg-indigo-50 text-indigo-700">
@@ -869,13 +677,13 @@ export const ConstraintsPanel: React.FC<ConstraintsPanelProps> = ({
               </div>
               <div>
                 <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                  2. Configuration des blocs possibles par Matière / Niveau
+                  2. Configuration des blocs possibles par Matière / Niveau / Classe
                   <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
                     Max 3h par bloc
                   </span>
                 </h2>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Définissez pour chaque matière et niveau les combinaisons de blocs hebdomadaires autorisées. Exemple : pour 7h, vous pouvez autoriser <strong>2h+2h+2h+1h</strong>, ou <strong>3h+3h+1h</strong>, ou <strong>3h+2h+2h</strong>.
+                  Définissez pour chaque matière, niveau et classe les combinaisons de blocs hebdomadaires autorisées. Exemple : pour 7h, vous pouvez autoriser <strong>2h+2h+2h+1h</strong>, ou <strong>3h+3h+1h</strong>, ou <strong>3h+2h+2h</strong>.
                 </p>
               </div>
             </div>
@@ -916,7 +724,7 @@ export const ConstraintsPanel: React.FC<ConstraintsPanelProps> = ({
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 {/* Sélecteur Matière */}
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-700 mb-1">
@@ -951,13 +759,14 @@ export const ConstraintsPanel: React.FC<ConstraintsPanelProps> = ({
                 {/* Sélecteur Niveau */}
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                    Niveau / Classe
+                    Niveau scolaire
                   </label>
                   <select
                     value={ruleNiveau}
                     onChange={(e) => {
                       const newNiv = e.target.value;
                       setRuleNiveau(newNiv);
+                      setRuleClasseId('*');
                       const match = projectCombinations.find((cb) => cb.matiere === ruleMatiere && (cb.niveau === newNiv || newNiv === '*'));
                       if (match) {
                         setRuleHours(match.heures);
@@ -979,10 +788,31 @@ export const ConstraintsPanel: React.FC<ConstraintsPanelProps> = ({
                   </select>
                 </div>
 
+                {/* Sélecteur Classe spécifique */}
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                    Classe cible (optionnel)
+                  </label>
+                  <select
+                    value={ruleClasseId}
+                    onChange={(e) => setRuleClasseId(e.target.value)}
+                    className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded-lg bg-white font-medium"
+                  >
+                    <option value="*">Toutes les classes du niveau (*)</option>
+                    {classes
+                      .filter((c) => ruleNiveau === '*' || c.niveau === ruleNiveau)
+                      .map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.nom} ({c.niveau})
+                        </option>
+                      ))}
+                  </select>
+                </div>
+
                 {/* Volume horaire hebdomadaire */}
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                    Volume horaire hebdomadaire
+                    Volume hebdomadaire
                   </label>
                   <div className="flex items-center gap-2">
                     <input
@@ -1228,8 +1058,14 @@ export const ConstraintsPanel: React.FC<ConstraintsPanelProps> = ({
                         </span>
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 text-xs font-semibold border border-purple-200">
                           <GraduationCap className="w-3.5 h-3.5" />
-                          {rule.niveau === '*' ? 'Tous les niveaux' : rule.niveau}
+                          {rule.niveau === '*' ? 'Tous les niveaux' : `Niveau ${rule.niveau}`}
                         </span>
+                        {rule.classeNom || rule.classeId ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-xs font-semibold border border-blue-200">
+                            <School className="w-3.5 h-3.5" />
+                            Classe : {rule.classeNom || rule.classeId}
+                          </span>
+                        ) : null}
                         <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-slate-100 text-slate-800 text-xs font-mono font-bold">
                           {rule.heuresHebdo} h / semaine
                         </span>

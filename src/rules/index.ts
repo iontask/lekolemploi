@@ -35,6 +35,8 @@ export const DEFAULT_RULES_OPTIONS: Required<RulesOptions> = {
   forbiddenSlotsTeachers: [],
   subjectBlockRules: [],
   maxHeuresParJourParMatiere: {},
+  maxHeuresParJourParMatiereNiveau: {},
+  maxHeuresParJourParMatiereClasse: {},
   relaxedMode: false,
 };
 
@@ -219,18 +221,95 @@ export function generatePossibleBlockPartitions(
 /**
  * Recherche une règle de blocs personnalisée correspondant à une matière et un niveau/classe donnés
  */
+/**
+ * Résout la limite journalière (1h, 2h ou 3h) d'une matière selon la hiérarchie :
+ * 1. Spécifique par Classe (clé: `${classeId}::${matiere}`)
+ * 2. Spécifique par Niveau (clé: `${niveau}::${matiere}`)
+ * 3. Spécifique par Matière (global)
+ * 4. Plafond journalier par défaut
+ */
+export function getSubjectDailyLimit(
+  matiere: string,
+  classeIds?: string[],
+  niveaux?: string[],
+  options?: RulesOptions
+): 1 | 2 | 3 {
+  if (!options) return 2;
+  const mat = (matiere || '').trim();
+
+  // 1. Spécifique par classe
+  if (options.maxHeuresParJourParMatiereClasse && classeIds && classeIds.length > 0) {
+    for (const cid of classeIds) {
+      const key = `${cid}::${mat}`;
+      if (options.maxHeuresParJourParMatiereClasse[key] !== undefined) {
+        return options.maxHeuresParJourParMatiereClasse[key];
+      }
+    }
+  }
+
+  // 2. Spécifique par niveau
+  if (options.maxHeuresParJourParMatiereNiveau && niveaux && niveaux.length > 0) {
+    for (const niv of niveaux) {
+      const key = `${niv}::${mat}`;
+      if (options.maxHeuresParJourParMatiereNiveau[key] !== undefined) {
+        return options.maxHeuresParJourParMatiereNiveau[key];
+      }
+    }
+  }
+
+  // 3. Spécifique par matière global
+  if (options.maxHeuresParJourParMatiere && options.maxHeuresParJourParMatiere[mat] !== undefined) {
+    return options.maxHeuresParJourParMatiere[mat];
+  }
+
+  // 4. Défaut
+  const defaultUnite = options.maxHeuresParJourUnite;
+  if (defaultUnite === 1 || defaultUnite === 2 || defaultUnite === 3) {
+    return defaultUnite as 1 | 2 | 3;
+  }
+  return 2;
+}
+
+/**
+ * Recherche une règle de blocs personnalisée correspondant à une matière et un niveau/classe donnés
+ * Priorité accordée à une règle spécifique à la classe, puis au niveau
+ */
 export function findMatchingBlockRule(
   matiere: string,
   niveauOuClasse: string,
   heures: number,
-  rules?: SubjectLevelBlockRule[]
+  rules?: SubjectLevelBlockRule[],
+  classeId?: string
 ): SubjectLevelBlockRule | undefined {
   if (!rules || rules.length === 0) return undefined;
   const matNorm = (matiere || '').trim().toLowerCase();
   const nivNorm = (niveauOuClasse || '').trim().toLowerCase();
 
+  // 1. Priorité règle spécifique par classe
+  if (classeId) {
+    const classRule = rules.find((r) => {
+      if (r.actif === false) return false;
+      if (!r.classeId || r.classeId === '*' || r.classeId === 'toutes') return false;
+      if (r.classeId !== classeId) return false;
+      if (r.heuresHebdo && r.heuresHebdo !== heures) return false;
+      const ruleMat = (r.matiere || '').trim().toLowerCase();
+      return (
+        ruleMat === '*' ||
+        ruleMat === 'toutes' ||
+        matNorm.includes(ruleMat) ||
+        ruleMat.includes(matNorm)
+      );
+    });
+    if (classRule) return classRule;
+  }
+
+  // 2. Règle par niveau ou générale
   return rules.find((r) => {
     if (r.actif === false) return false;
+    // Si la règle est restreinte à une autre classe précise, l'ignorer
+    if (r.classeId && r.classeId !== '*' && r.classeId !== 'toutes' && classeId && r.classeId !== classeId) {
+      return false;
+    }
     if (r.heuresHebdo && r.heuresHebdo !== heures) return false;
 
     const ruleMat = (r.matiere || '').trim().toLowerCase();
@@ -523,7 +602,8 @@ export function verify(
       prof.matiere,
       classesNiveaux,
       unite.heures,
-      options.subjectBlockRules
+      options.subjectBlockRules,
+      unite.classeIds[0]
     );
 
     // Répartition des créneaux par jour
@@ -606,11 +686,16 @@ export function verify(
         }
       }
     } else {
-      // --- MODÈLE STANDARD (Flexible : 1h, 2h ou 3h selon la grille par matière) ---
-      const subjectLimit: number =
-        (prof.matiere ? options.maxHeuresParJourParMatiere?.[prof.matiere] : undefined)
-        ?? options.maxHeuresParJourUnite
-        ?? 2;
+      // --- MODÈLE STANDARD (Flexible : 1h, 2h ou 3h selon la grille par matière/niveau/classe) ---
+      const classesNiveauxList = unite.classeIds
+        .map((cid) => classMap.get(cid)?.niveau)
+        .filter(Boolean) as string[];
+      const subjectLimit: number = getSubjectDailyLimit(
+        prof.matiere,
+        unite.classeIds,
+        classesNiveauxList,
+        options
+      );
       let joursAvecUneHeure = 0;
 
       for (const [jourIndex, slotsJour] of slotsParJour.entries()) {
@@ -721,14 +806,20 @@ export function score(
 
   const uniteMap = new Map(data.unites.map((u) => [u.id, u]));
   const teacherMap = new Map(data.teachers.map((t) => [t.id, t]));
+  const classMap = new Map(data.classes.map((c) => [c.id, c]));
 
   for (const [uniteId, slots] of affsParUnite.entries()) {
     const unite = uniteMap.get(uniteId);
     const teacher = unite ? teacherMap.get(unite.teacherId) : undefined;
-    const subjectLimit: number =
-      (teacher?.matiere ? options.maxHeuresParJourParMatiere?.[teacher.matiere] : undefined)
-      ?? options.maxHeuresParJourUnite
-      ?? 2;
+    const classesNiveauxList = unite
+      ? (unite.classeIds.map((cid) => classMap.get(cid)?.niveau).filter(Boolean) as string[])
+      : [];
+    const subjectLimit: number = getSubjectDailyLimit(
+      teacher?.matiere || '',
+      unite?.classeIds,
+      classesNiveauxList,
+      options
+    );
 
     const slotsParJour = new Map<number, number[]>();
     for (const slot of slots) {
@@ -882,7 +973,8 @@ export function canPlace(
       teacher.matiere,
       classesNiveaux,
       unite.heures,
-      options.subjectBlockRules
+      options.subjectBlockRules,
+      unite.classeIds[0]
     );
 
     const slotsMemeJour = planning
@@ -921,11 +1013,19 @@ export function canPlace(
         options.matieresABlocs,
         options.toutesMatieresABlocs !== false
       ) ||
-      (options.maxHeuresParJourParMatiere && options.maxHeuresParJourParMatiere[teacher.matiere] !== undefined)
+      (options.maxHeuresParJourParMatiere && options.maxHeuresParJourParMatiere[teacher.matiere] !== undefined) ||
+      options.maxHeuresParJourParMatiereNiveau ||
+      options.maxHeuresParJourParMatiereClasse
     ) {
-      const subjectLimit = (options.maxHeuresParJourParMatiere && options.maxHeuresParJourParMatiere[teacher.matiere])
-        ?? options.maxHeuresParJourUnite
-        ?? 2;
+      const classesNiveauxList = unite.classeIds
+        .map((cid) => classMap.get(cid)?.niveau)
+        .filter(Boolean) as string[];
+      const subjectLimit = getSubjectDailyLimit(
+        teacher.matiere,
+        unite.classeIds,
+        classesNiveauxList,
+        options
+      );
 
       if (subjectLimit === 1) {
         // Limite stricte à 1h par jour

@@ -47,6 +47,10 @@ export interface SolverConfig {
   subjectBlockRules?: import('../rules/types').SubjectLevelBlockRule[];
   /** Limite maximale d'heures par jour/séance par matière (1h, 2h ou 3h) */
   maxHeuresParJourParMatiere?: Record<string, 1 | 2 | 3>;
+  /** Limite maximale d'heures par jour/séance par matière et par NIVEAU (clé: `${niveau}::${matiere}`) */
+  maxHeuresParJourParMatiereNiveau?: Record<string, 1 | 2 | 3>;
+  /** Limite maximale d'heures par jour/séance par matière et par CLASSE (clé: `${classeId}::${matiere}`) */
+  maxHeuresParJourParMatiereClasse?: Record<string, 1 | 2 | 3>;
   /** Respecter la pause de 1h après 4h (entre C4 et C5) : aucun bloc à cheval */
   respecterPauseMidiBlocs?: boolean;
   /** Mode relâché : règles souples assouplies en cas d'infaisabilité */
@@ -73,6 +77,8 @@ export const DEFAULT_SOLVER_CONFIG: SolverConfig = {
   forbiddenSlotsTeachers: [],
   subjectBlockRules: [],
   maxHeuresParJourParMatiere: {},
+  maxHeuresParJourParMatiereNiveau: {},
+  maxHeuresParJourParMatiereClasse: {},
   relaxedMode: false,
 };
 

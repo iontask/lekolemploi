@@ -8,6 +8,7 @@ import {
   areSlotsConsecutiveWithoutPause,
   findMatchingBlockRule,
   getSlotCoordinates,
+  getSubjectDailyLimit,
   isBlockSubject,
 } from '../rules';
 import { Planning, ScheduleData } from '../rules/types';
@@ -105,15 +106,20 @@ export function buildLpModel(
   // 3. Contraintes (Subject To)
   const constraints: string[] = [];
 
-  // Contrainte 1 : Somme sur s de x[u, s] = h pour chaque unité
+  // Contrainte 1 : Somme sur s de x[u, s] + miss_u = h pour chaque unité (Goal Programming / Slack)
   for (let uIdx = 0; uIdx < unites.length; uIdx++) {
     const unite = unites[uIdx];
     const validSlots = validSlotsPerUnit.get(uIdx) || [];
     const sumTerms = validSlots.map((s) => xVarName(uIdx, s)).join(' + ');
+    const missVar = `miss_u${uIdx}`;
+    allGenerals.push(missVar);
+    bounds.push(`0 <= ${missVar} <= ${unite.heures}`);
+    objTerms.push(`100000 ${missVar}`);
+
     if (sumTerms.length > 0) {
-      constraints.push(`quota_u${uIdx}: ${sumTerms} = ${unite.heures}`);
+      constraints.push(`quota_u${uIdx}: ${sumTerms} + ${missVar} = ${unite.heures}`);
     } else {
-      constraints.push(`quota_u${uIdx}: 0 = ${unite.heures}`);
+      constraints.push(`quota_u${uIdx}: ${missVar} = ${unite.heures}`);
     }
   }
 
@@ -208,7 +214,15 @@ export function buildLpModel(
       constraints.push(`link_block_u${uIdx}_s${s}: ${linkTerms.join(' ')} = 0`);
     }
 
-    const subjectLimit = config.maxHeuresParJourParMatiere?.[prof.matiere] ?? config.maxHeuresParJourUnite ?? 2;
+    const classesNiveauxList = unite.classeIds
+      .map((cid) => classMap.get(cid)?.niveau)
+      .filter(Boolean) as string[];
+    const subjectLimit = getSubjectDailyLimit(
+      prof.matiere,
+      unite.classeIds,
+      classesNiveauxList,
+      config
+    );
 
     // Somme des z = h modulo 2
     // En mode relâché, ou si la matière autorise 3h/jour, ou si toutesMatieresABlocs est désactivé,
@@ -231,7 +245,8 @@ export function buildLpModel(
       prof.matiere,
       classesNiveaux,
       unite.heures,
-      config.subjectBlockRules
+      config.subjectBlockRules,
+      unite.classeIds[0]
     );
 
     const maxDurForUnit =
@@ -239,12 +254,14 @@ export function buildLpModel(
         ? Math.min(3, Math.max(1, ...matchingRule.possibilites.map((p) => Math.max(...p))))
         : subjectLimit;
 
-    // Au plus maxDurForUnit h par jour (dur pour matière à blocs)
-    for (let j = 0; j < semaine.jours.length; j++) {
-      const daySlots = validSlots.filter((s) => getSlotCoordinates(s, semaine).jourIndex === j);
-      if (daySlots.length > maxDurForUnit) {
-        const dayXTerms = daySlots.map((s) => xVarName(uIdx, s)).join(' + ');
-        constraints.push(`max_dur_u${uIdx}_j${j}: ${dayXTerms} <= ${maxDurForUnit}`);
+    // Au plus maxDurForUnit h par jour (dur pour matière à blocs sauf en mode relâché)
+    if (!config.relaxedMode) {
+      for (let j = 0; j < semaine.jours.length; j++) {
+        const daySlots = validSlots.filter((s) => getSlotCoordinates(s, semaine).jourIndex === j);
+        if (daySlots.length > maxDurForUnit) {
+          const dayXTerms = daySlots.map((s) => xVarName(uIdx, s)).join(' + ');
+          constraints.push(`max_dur_u${uIdx}_j${j}: ${dayXTerms} <= ${maxDurForUnit}`);
+        }
       }
     }
   }
@@ -256,21 +273,27 @@ export function buildLpModel(
   for (let uIdx = 0; uIdx < unites.length; uIdx++) {
     const validSlots = validSlotsPerUnit.get(uIdx) || [];
     const unitProf = teacherMap.get(unites[uIdx].teacherId);
-    const uClassesNiveaux = unites[uIdx].classeIds
-      .map((cid) => classMap.get(cid)?.niveau || '')
-      .filter(Boolean)
-      .join(' / ');
+    const uClassesNiveauxList = unites[uIdx].classeIds
+      .map((cid) => classMap.get(cid)?.niveau)
+      .filter(Boolean) as string[];
+    const uClassesNiveaux = uClassesNiveauxList.join(' / ');
     const uMatchingRule = unitProf
       ? findMatchingBlockRule(
           unitProf.matiere,
           uClassesNiveaux,
           unites[uIdx].heures,
-          config.subjectBlockRules
+          config.subjectBlockRules,
+          unites[uIdx].classeIds[0]
         )
       : undefined;
-    const uSubjectLimit = (unitProf && config.maxHeuresParJourParMatiere?.[unitProf.matiere])
-      ?? config.maxHeuresParJourUnite
-      ?? 2;
+    const uSubjectLimit = unitProf
+      ? getSubjectDailyLimit(
+          unitProf.matiere,
+          unites[uIdx].classeIds,
+          uClassesNiveauxList,
+          config
+        )
+      : (config.maxHeuresParJourUnite ?? 2);
     const uMaxDur =
       uMatchingRule && uMatchingRule.possibilites.length > 0
         ? Math.min(3, Math.max(1, ...uMatchingRule.possibilites.map((p) => Math.max(...p))))

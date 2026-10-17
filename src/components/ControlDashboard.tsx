@@ -58,7 +58,7 @@ interface ControlDashboardProps {
   onOpenGenerator: (relaxedMode?: boolean) => void;
   onOpenGeneratorWithLocks?: (lockedAssignments: import('../rules/types').Affectation[]) => void;
   onUpdatePlanning?: (newPlanning: import('../rules/types').Planning) => void;
-  onSaveConstraints?: (constraints: import('../rules/types').RulesOptions) => void;
+  onSaveConstraints?: (constraints: import('../rules/types').RulesOptions, updatedUnites?: import('../types').Unite[]) => void;
   onUpdateScenarios?: (scenarios: import('../types/scenarios').ScheduleScenario[]) => void;
   onApplyScenario?: (scenario: import('../types/scenarios').ScheduleScenario) => void;
 }
@@ -178,7 +178,7 @@ export const ControlDashboard: React.FC<ControlDashboardProps> = ({
         <ConstraintsPanel
           dataset={dataset}
           currentConstraints={dataset.constraints}
-          onSaveConstraints={(newC) => onSaveConstraints?.(newC)}
+          onSaveConstraints={(newC, updatedUnites) => onSaveConstraints?.(newC, updatedUnites)}
         />
       </div>
     );
