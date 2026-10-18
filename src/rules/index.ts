@@ -38,6 +38,8 @@ export const DEFAULT_RULES_OPTIONS: Required<RulesOptions> = {
   maxHeuresParJourParMatiereNiveau: {},
   maxHeuresParJourParMatiereClasse: {},
   relaxedMode: false,
+  disabledOverages: [],
+  interdireTousDepassements: false,
 };
 
 /** Plages horaires standard de 1h chacune (7 créneaux lundi-jeudi, 4 créneaux vendredi) */
@@ -268,6 +270,31 @@ export function getSubjectDailyLimit(
     return defaultUnite as 1 | 2 | 3;
   }
   return 2;
+}
+
+/**
+ * Vérifie si un dépassement de 2h/jour est désactivé (Reverse Dépassement actif)
+ * pour une unité d'enseignement donnée et un jour précis.
+ */
+export function isOverageDisabledForUnit(
+  uniteId: string,
+  jourIndex: number,
+  options?: RulesOptions
+): boolean {
+  if (!options) return false;
+  if (options.interdireTousDepassements) return true;
+  if (!options.disabledOverages || options.disabledOverages.length === 0) return false;
+
+  const keyExact = `exc_${uniteId}_j${jourIndex}`;
+  const keyShort = `${uniteId}_j${jourIndex}`;
+  const keyUnit = uniteId;
+
+  return (
+    options.disabledOverages.includes(keyExact) ||
+    options.disabledOverages.includes(keyShort) ||
+    options.disabledOverages.includes(keyUnit) ||
+    options.disabledOverages.includes('all')
+  );
 }
 
 /**
@@ -703,11 +730,13 @@ export function verify(
         slotsJour.sort((a, b) => a - b);
 
         // (5.A) Dépassement de la limite maximale par jour pour cette matière
-        if (slotsJour.length > (options.relaxedMode ? Math.max(subjectLimit, 3) : subjectLimit)) {
+        const isOverDisabled = isOverageDisabledForUnit(unite.id, jourIndex, options);
+        const effectiveLimit = isOverDisabled ? Math.min(2, subjectLimit) : subjectLimit;
+        if (slotsJour.length > (options.relaxedMode && !isOverDisabled ? Math.max(effectiveLimit, 3) : effectiveLimit)) {
           violations.push({
             type: 'BLOC_EXCES_JOUR',
             severite: 'DURE',
-            message: `L'unité de ${prof.matiere} (${classesNoms}) a ${slotsJour.length} heures le ${jourNom}, dépasse la limite maximale de ${subjectLimit} h par jour configurée pour cette matière.`,
+            message: `L'unité de ${prof.matiere} (${classesNoms}) a ${slotsJour.length} heures le ${jourNom}, dépasse la limite maximale de ${effectiveLimit} h par jour${isOverDisabled ? ' (Reverse Dépassement actif)' : ''}.`,
             uniteId: unite.id,
             profId: prof.id,
             profNom: prof.nom,
@@ -981,6 +1010,13 @@ export function canPlace(
       .filter((a) => a.uniteId === unite.id)
       .map((a) => a.slot)
       .filter((s) => getSlotCoordinates(s, data.semaine).jourIndex === coords.jourIndex);
+
+    const isOverDisabled = isOverageDisabledForUnit(unite.id, coords.jourIndex, options);
+    if (isOverDisabled && slotsMemeJour.length >= 2) {
+      raisons.push(
+        `Reverse Dépassement actif : dépassement de 2h strictement interdit pour cette matière le ${coords.jourNom}.`
+      );
+    }
 
     if (matchingRule && matchingRule.possibilites.length > 0) {
       // Règle personnalisée de découpage en blocs (max 3h)

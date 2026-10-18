@@ -38,6 +38,8 @@ import {
 import { SolverClient } from '../solver/solverClient';
 import { runInstantDiagnostics } from '../utils/infeasibilityDiagnostic';
 import { AIRecommendationsPanel } from './AIRecommendationsPanel';
+import { analyzeScheduleExceptions } from '../utils/scheduleExceptions';
+import { getSubjectAbbreviation, getSubjectMeta } from '../utils/subjectFormatters';
 
 interface GenerationModalProps {
   isOpen: boolean;
@@ -47,6 +49,8 @@ interface GenerationModalProps {
   lockedAssignments?: import('../rules/types').Affectation[];
   initialKeepLocked?: boolean;
   initialRelaxedMode?: boolean;
+  initialDisabledOverages?: string[];
+  initialInterdireTousDepassements?: boolean;
 }
 
 export const GenerationModal: React.FC<GenerationModalProps> = ({
@@ -57,11 +61,15 @@ export const GenerationModal: React.FC<GenerationModalProps> = ({
   lockedAssignments = [],
   initialKeepLocked = true,
   initialRelaxedMode = false,
+  initialDisabledOverages,
+  initialInterdireTousDepassements,
 }) => {
   const [config, setConfig] = useState<SolverConfig>(() => ({
     ...DEFAULT_SOLVER_CONFIG,
     ...(dataset.constraints || {}),
     relaxedMode: initialRelaxedMode,
+    disabledOverages: initialDisabledOverages ?? dataset.constraints?.disabledOverages ?? [],
+    interdireTousDepassements: initialInterdireTousDepassements ?? dataset.constraints?.interdireTousDepassements ?? false,
   }));
   const [solverClient] = useState<SolverClient>(() => new SolverClient());
   const [isSolving, setIsSolving] = useState(false);
@@ -78,6 +86,12 @@ export const GenerationModal: React.FC<GenerationModalProps> = ({
   const [logFilterSeverity, setLogFilterSeverity] = useState<string>('ALL');
   const [logSearchQuery, setLogSearchQuery] = useState('');
   const [isCopied, setIsCopied] = useState(false);
+  const [showOveragesList, setShowOveragesList] = useState(false);
+
+  const detectedOverages = useMemo(() => {
+    if (!dataset.planning || dataset.planning.length === 0) return [];
+    return analyzeScheduleExceptions(dataset, dataset.planning).exces2hJour;
+  }, [dataset]);
 
   // Basculer automatiquement sur l'onglet Journal si l'utilisateur le souhaite ou si des goulots sont présents
   useEffect(() => {
@@ -85,6 +99,19 @@ export const GenerationModal: React.FC<GenerationModalProps> = ({
       // Si des matières ne sont pas affectées, laisser les onglets accessibles
     }
   }, [result]);
+
+  useEffect(() => {
+    if (isOpen) {
+      setConfig((prev) => ({
+        ...prev,
+        relaxedMode: initialRelaxedMode,
+        disabledOverages:
+          initialDisabledOverages ?? dataset.constraints?.disabledOverages ?? prev.disabledOverages ?? [],
+        interdireTousDepassements:
+          initialInterdireTousDepassements ?? dataset.constraints?.interdireTousDepassements ?? prev.interdireTousDepassements ?? false,
+      }));
+    }
+  }, [isOpen, initialRelaxedMode, initialDisabledOverages, initialInterdireTousDepassements, dataset.constraints]);
 
   const diagnostic = useMemo(() => {
     return runInstantDiagnostics(
@@ -886,6 +913,172 @@ export const GenerationModal: React.FC<GenerationModalProps> = ({
                       </label>
                     </div>
                   </div>
+                </div>
+
+                {/* Section Reverse Dépassement */}
+                <div className="col-span-1 sm:col-span-2 p-3.5 bg-gradient-to-r from-purple-50/90 to-indigo-50/80 border border-purple-200 rounded-xl space-y-2.5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1 rounded-md bg-purple-600 text-white shrink-0">
+                        <SlidersHorizontal className="w-3.5 h-3.5" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-purple-950">
+                            Option Reverse Dépassement
+                          </span>
+                          {config.disabledOverages && config.disabledOverages.length > 0 && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] bg-purple-200 text-purple-900 font-bold">
+                              {config.disabledOverages.length} dépassement(s) neutralisé(s)
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-purple-800">
+                          Force le solveur à respecter strictement le plafond de 2h/jour pour les matières/jours sélectionnés.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <label className="flex items-center gap-2 text-xs font-semibold text-purple-950 cursor-pointer bg-white px-2.5 py-1.5 rounded-lg border border-purple-300 shadow-2xs">
+                        <input
+                          type="checkbox"
+                          checked={config.interdireTousDepassements || false}
+                          onChange={(e) =>
+                            setConfig({
+                              ...config,
+                              interdireTousDepassements: e.target.checked,
+                            })
+                          }
+                          className="rounded text-purple-600 focus:ring-purple-500"
+                        />
+                        <span>Interdire TOUS les dépassements (Règle stricte)</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Boutons d'action et toggle liste des dépassements détectés */}
+                  {detectedOverages.length > 0 && (
+                    <div className="pt-2 border-t border-purple-200/70 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <button
+                          type="button"
+                          onClick={() => setShowOveragesList(!showOveragesList)}
+                          className="inline-flex items-center gap-1.5 text-xs font-bold text-purple-900 hover:text-purple-950"
+                        >
+                          {showOveragesList ? (
+                            <ChevronUp className="w-3.5 h-3.5 text-purple-700" />
+                          ) : (
+                            <ChevronDown className="w-3.5 h-3.5 text-purple-700" />
+                          )}
+                          <span>
+                            Dépassements détectés dans l'output ({detectedOverages.length})
+                          </span>
+                          <span className="text-[11px] font-normal text-purple-700">
+                            — cliquez pour {showOveragesList ? 'replier' : 'cocher / décocher individuellement'}
+                          </span>
+                        </button>
+
+                        {!config.interdireTousDepassements && (
+                          <div className="flex items-center gap-2 text-[11px]">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setConfig({
+                                  ...config,
+                                  disabledOverages: detectedOverages.map((o) => o.id),
+                                })
+                              }
+                              className="text-purple-700 hover:text-purple-900 underline"
+                            >
+                              Tout neutraliser
+                            </button>
+                            <span className="text-purple-300">·</span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setConfig({
+                                  ...config,
+                                  disabledOverages: [],
+                                })
+                              }
+                              className="text-slate-500 hover:text-slate-700 underline"
+                            >
+                              Tout autoriser
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      {showOveragesList && (
+                        <div className="max-h-48 overflow-y-auto space-y-1.5 bg-white/80 p-2 rounded-lg border border-purple-200/60 divide-y divide-purple-100/60 text-xs">
+                          {detectedOverages.map((exc) => {
+                            const isChecked =
+                              config.interdireTousDepassements ||
+                              (config.disabledOverages && config.disabledOverages.includes(exc.id));
+
+                            const toggleExc = () => {
+                              if (config.interdireTousDepassements) return;
+                              const current = config.disabledOverages || [];
+                              const next = current.includes(exc.id)
+                                ? current.filter((id) => id !== exc.id)
+                                : [...current, exc.id];
+                              setConfig({ ...config, disabledOverages: next });
+                            };
+
+                            const meta = exc.matiere ? getSubjectMeta(exc.matiere) : null;
+                            const abbr = exc.matiere ? getSubjectAbbreviation(exc.matiere) : 'ENS';
+
+                            return (
+                              <label
+                                key={exc.id}
+                                className={`flex items-center justify-between p-1.5 rounded cursor-pointer transition-colors ${
+                                  isChecked ? 'bg-purple-100/60 text-purple-950 font-medium' : 'hover:bg-slate-50 text-slate-700'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="checkbox"
+                                    checked={Boolean(isChecked)}
+                                    disabled={config.interdireTousDepassements}
+                                    onChange={toggleExc}
+                                    className="rounded text-purple-600 focus:ring-purple-500 w-3.5 h-3.5"
+                                  />
+                                  <span
+                                    className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                      meta?.badgeClass || 'bg-slate-100 text-slate-800'
+                                    }`}
+                                  >
+                                    {abbr}
+                                  </span>
+                                  <span className="font-semibold">{exc.entiteNom}</span>
+                                  <span className="text-slate-500">· {exc.jourNom}</span>
+                                </div>
+                                <span className="text-[11px] text-slate-500">
+                                  {isChecked ? '🛡️ Interdit' : '⚠️ Toléré'}
+                                </span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {config.disabledOverages && config.disabledOverages.length > 0 && !config.interdireTousDepassements && !detectedOverages.length && (
+                    <div className="pt-1.5 border-t border-purple-200/60 flex items-center justify-between text-[11px] text-purple-900">
+                      <span>
+                        🛡️ <strong>{config.disabledOverages.length}</strong> dépassement(s) converti(s) en contrainte(s) dure(s) pour cette génération.
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setConfig({ ...config, disabledOverages: [] })}
+                        className="text-purple-700 hover:text-purple-900 underline text-[11px]"
+                      >
+                        Réinitialiser (tout autoriser)
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

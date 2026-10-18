@@ -55,7 +55,11 @@ interface ControlDashboardProps {
       | 'raw'
   ) => void;
   onOpenMapping: () => void;
-  onOpenGenerator: (relaxedMode?: boolean) => void;
+  onOpenGenerator: (
+    relaxedMode?: boolean,
+    disabledOverages?: string[],
+    interdireTousDepassements?: boolean
+  ) => void;
   onOpenGeneratorWithLocks?: (lockedAssignments: import('../rules/types').Affectation[]) => void;
   onUpdatePlanning?: (newPlanning: import('../rules/types').Planning) => void;
   onSaveConstraints?: (constraints: import('../rules/types').RulesOptions, updatedUnites?: import('../types').Unite[]) => void;
@@ -163,9 +167,10 @@ export const ControlDashboard: React.FC<ControlDashboardProps> = ({
           dataset={dataset}
           planning={dataset.planning}
           resultInfo={dataset.solverResult}
-          onOpenGenerator={() => onOpenGenerator()}
+          onOpenGenerator={onOpenGenerator}
           onOpenGeneratorWithLocks={onOpenGeneratorWithLocks}
           onUpdatePlanning={onUpdatePlanning}
+          onSaveConstraints={onSaveConstraints}
         />
       </div>
     );

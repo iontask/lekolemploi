@@ -166,16 +166,15 @@ export const PrintPdfModal: React.FC<PrintPdfModalProps> = ({
   };
 
   const handleBrowserPrint = () => {
-    onClose();
-    // Laisser le temps à la boîte modale de se fermer avant d'ouvrir la boîte d'impression
-    setTimeout(() => {
-      const res = triggerSafeBrowserPrint();
-      if (!res.success) {
-        alert(
-          'L\'impression directe via le navigateur n\'a pas pu s\'ouvrir (restriction d\'iframe). Utilisez le bouton « Télécharger PDF (Paysage) » pour obtenir le fichier PDF instantanément !'
-        );
-      }
-    }, 250);
+    const res = triggerSafeBrowserPrint();
+    if (!res.success) {
+      setFeedbackMessage({
+        text: 'L\'impression directe via le navigateur n\'a pas pu s\'ouvrir (restriction d\'iframe). Utilisez le bouton « Télécharger PDF (Paysage) » pour obtenir le fichier PDF instantanément !',
+        type: 'info',
+      });
+    } else {
+      onClose();
+    }
   };
 
   return (

@@ -97,4 +97,52 @@ describe('Étape 4 - Détection et analyse des exceptions d\'emploi du temps', (
     expect(Array.isArray(analysis.trousProfs)).toBe(true);
     expect(analysis.creneauxLibresTotal).toBe(1 * 32 - 4);
   });
+
+  it('génère un identifiant d\'exception exploitable par isOverageDisabledForUnit (Reverse Dépassement)', async () => {
+    const { isOverageDisabledForUnit } = await import('../../rules');
+    // Planning artificiel avec 3h le lundi (slots 0, 1, 2)
+    const planningWithOverage = [
+      { uniteId: uniteMath4h.id, slot: 0 },
+      { uniteId: uniteMath4h.id, slot: 1 },
+      { uniteId: uniteMath4h.id, slot: 2 },
+      { uniteId: uniteMath4h.id, slot: 7 }, // mardi
+    ];
+
+    const report = generateAuditReport(
+      testData.teachers,
+      testData.classes,
+      testData.unites,
+      testData.semaine
+    );
+
+    const dataset = {
+      ...testData,
+      id: 'test_dataset',
+      fileName: 'test.xlsx',
+      importedAt: new Date().toISOString(),
+      config: DEFAULT_MAPPING_CONFIG,
+      report,
+    };
+
+    const analysis = analyzeScheduleExceptions(dataset, planningWithOverage);
+    expect(analysis.exces2hJour.length).toBe(1);
+    const exc = analysis.exces2hJour[0];
+    expect(exc.id).toBe(`exc_${uniteMath4h.id}_j0`);
+    expect(exc.jourIndex).toBe(0);
+    expect(exc.creneaux).toEqual([0, 1, 2]);
+
+    // Test Reverse Dépassement ciblé avec cet identifiant
+    const configDisabled = {
+      disabledOverages: [exc.id],
+    };
+    expect(isOverageDisabledForUnit(uniteMath4h.id, 0, configDisabled)).toBe(true);
+    expect(isOverageDisabledForUnit(uniteMath4h.id, 1, configDisabled)).toBe(false);
+
+    // Test Reverse Dépassement global
+    const configGlobal = {
+      interdireTousDepassements: true,
+    };
+    expect(isOverageDisabledForUnit(uniteMath4h.id, 0, configGlobal)).toBe(true);
+    expect(isOverageDisabledForUnit(uniteMath4h.id, 1, configGlobal)).toBe(true);
+  });
 });

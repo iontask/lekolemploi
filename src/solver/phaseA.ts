@@ -12,6 +12,7 @@ import {
   getSlotCoordinates,
   getSubjectDailyLimit,
   isBlockSubject,
+  isOverageDisabledForUnit,
   verify,
 } from '../rules';
 import { Affectation, Planning, ScheduleData } from '../rules/types';
@@ -447,6 +448,7 @@ export function solvePhaseAWithDiagnostics(
       if (subjectLimit === 3 && remainingHeures >= 3) {
         const candidateTriplets = validBlockTriplets.filter((t) => {
           if (placedDays.has(t.jourIndex)) return false;
+          if (isOverageDisabledForUnit(unite.id, t.jourIndex, config)) return false;
           if (!teacher.dispo[t.slot1] || !teacher.dispo[t.slot2] || !teacher.dispo[t.slot3]) return false;
           if (!canPlace(currentPlanning, unite, t.slot1, data, config).ok) return false;
           const tp1 = [...currentPlanning, { uniteId: unite.id, slot: t.slot1 }];
@@ -524,6 +526,13 @@ export function solvePhaseAWithDiagnostics(
           const singleCandidates = Array.from({ length: totalSlots }, (_, i) => i)
             .filter((s) => {
               const coords = getSlotCoordinates(s, semaine);
+              const isOverDisabled = isOverageDisabledForUnit(unite.id, coords.jourIndex, config);
+              if (isOverDisabled) {
+                const alreadyOnThisDay = currentPlanning.filter(
+                  (a) => a.uniteId === unite.id && getSlotCoordinates(a.slot, semaine).jourIndex === coords.jourIndex
+                ).length;
+                if (alreadyOnThisDay >= 2) return false;
+              }
               if (placedDays.has(coords.jourIndex) && !config.relaxedMode && subjectLimit <= 2) {
                 return false;
               }

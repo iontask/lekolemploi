@@ -10,6 +10,7 @@ import {
   getSlotCoordinates,
   getSubjectDailyLimit,
   isBlockSubject,
+  isOverageDisabledForUnit,
 } from '../rules';
 import { Planning, ScheduleData } from '../rules/types';
 import { SolverConfig } from './types';
@@ -301,10 +302,18 @@ export function buildLpModel(
 
     for (let j = 0; j < semaine.jours.length; j++) {
       const daySlots = validSlots.filter((s) => getSlotCoordinates(s, semaine).jourIndex === j);
+      const isOverDisabled = isOverageDisabledForUnit(unites[uIdx].id, j, config);
+      const effectiveMaxDur = isOverDisabled ? Math.min(2, uMaxDur) : uMaxDur;
 
-      if (daySlots.length > uMaxDur) {
+      if (daySlots.length > effectiveMaxDur) {
         const dayXTerms = daySlots.map((s) => xVarName(uIdx, s)).join(' + ');
-        constraints.push(`soft_excess_u${uIdx}_j${j}: ${dayXTerms} - ${eVarName(uIdx, j)} <= ${uMaxDur}`);
+        if (isOverDisabled) {
+          // CONTRAINTE DURE (Reverse Dépassement) : Interdiction stricte de dépasser
+          constraints.push(`hard_no_excess_u${uIdx}_j${j}: ${dayXTerms} <= ${effectiveMaxDur}`);
+          bounds.push(`${eVarName(uIdx, j)} = 0`);
+        } else {
+          constraints.push(`soft_excess_u${uIdx}_j${j}: ${dayXTerms} - ${eVarName(uIdx, j)} <= ${effectiveMaxDur}`);
+        }
       }
 
       // Non-consécutif : détection de trou

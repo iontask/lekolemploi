@@ -226,10 +226,30 @@ export function App() {
   };
 
   const [lockedAssignmentsForGen, setLockedAssignmentsForGen] = useState<Planning>([]);
+  const [disabledOveragesForGen, setDisabledOveragesForGen] = useState<string[]>([]);
+  const [interdireTousDepassementsForGen, setInterdireTousDepassementsForGen] = useState<boolean>(false);
+
+  const handleOpenGenerator = (
+    relaxed?: boolean,
+    disabledOverages?: string[],
+    interdireTous?: boolean
+  ) => {
+    setLockedAssignmentsForGen([]);
+    setIsRelaxedModeForGen(Boolean(relaxed));
+    setDisabledOveragesForGen(
+      disabledOverages ?? dataset?.constraints?.disabledOverages ?? []
+    );
+    setInterdireTousDepassementsForGen(
+      interdireTous ?? dataset?.constraints?.interdireTousDepassements ?? false
+    );
+    setIsGenerationOpen(true);
+  };
 
   const handleOpenGeneratorWithLocks = (locked: Planning) => {
     setLockedAssignmentsForGen(locked);
     setIsRelaxedModeForGen(false);
+    setDisabledOveragesForGen(dataset?.constraints?.disabledOverages ?? []);
+    setInterdireTousDepassementsForGen(dataset?.constraints?.interdireTousDepassements ?? false);
     setIsGenerationOpen(true);
   };
 
@@ -309,11 +329,7 @@ export function App() {
         projectName={dataset?.fileName}
         isSaving={isSaving}
         lastSavedAt={lastSavedAt}
-        onOpenGenerator={() => {
-          setLockedAssignmentsForGen([]);
-          setIsRelaxedModeForGen(false);
-          setIsGenerationOpen(true);
-        }}
+        onOpenGenerator={() => handleOpenGenerator(false)}
         hasDataset={dataset !== null}
         hasPlanning={Boolean(dataset?.planning && dataset.planning.length > 0)}
         onReset={handleOpenResetConfirm}
@@ -349,11 +365,7 @@ export function App() {
             activeTab={activeView}
             onSelectTab={setActiveView}
             onOpenMapping={() => setIsMappingOpen(true)}
-            onOpenGenerator={(relaxed) => {
-              setLockedAssignmentsForGen([]);
-              setIsRelaxedModeForGen(Boolean(relaxed));
-              setIsGenerationOpen(true);
-            }}
+            onOpenGenerator={handleOpenGenerator}
             onOpenGeneratorWithLocks={handleOpenGeneratorWithLocks}
             onUpdatePlanning={handleUpdatePlanning}
             onSaveConstraints={handleSaveConstraints}
@@ -399,6 +411,8 @@ export function App() {
           lockedAssignments={lockedAssignmentsForGen}
           initialKeepLocked={lockedAssignmentsForGen.length > 0}
           initialRelaxedMode={isRelaxedModeForGen}
+          initialDisabledOverages={disabledOveragesForGen}
+          initialInterdireTousDepassements={interdireTousDepassementsForGen}
         />
       )}
 

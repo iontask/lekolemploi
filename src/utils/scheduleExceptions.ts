@@ -18,6 +18,9 @@ export interface ScheduleException {
   entiteNom: string; // Nom de la classe ou du prof
   matiere?: string;
   creneaux?: number[];
+  uniteId?: string;
+  teacherId?: string;
+  classeIds?: string[];
 }
 
 export interface ExceptionsSummary {
@@ -93,6 +96,9 @@ export function analyzeScheduleExceptions(
           entiteNom: `${prof?.nom} (${classesNoms})`,
           matiere: prof?.matiere,
           creneaux: slotsJour,
+          uniteId,
+          teacherId: unite.teacherId,
+          classeIds: unite.classeIds,
         });
       }
 
@@ -121,6 +127,9 @@ export function analyzeScheduleExceptions(
             entiteNom: `${prof?.nom} (${classesNoms})`,
             matiere: prof?.matiere,
             creneaux: slotsJour,
+            uniteId,
+            teacherId: unite.teacherId,
+            classeIds: unite.classeIds,
           });
         }
       }

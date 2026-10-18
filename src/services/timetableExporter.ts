@@ -81,9 +81,10 @@ export async function exportTimetableMultiSheetsExcel(
   wsRecap.getColumn(2).width = 30;
   wsRecap.getColumn(3).width = 18;
   wsRecap.getColumn(4).width = 45;
+  wsRecap.getColumn(5).width = 35;
 
   // Titre
-  wsRecap.mergeCells('A1:D1');
+  wsRecap.mergeCells('A1:E1');
   const r1 = wsRecap.getCell('A1');
   r1.value = 'RÉCAPITULATIF DE L\'EMPLOI DU TEMPS & AUDIT DES EXCEPTIONS';
   r1.font = { bold: true, size: 14, color: { argb: 'FFFFFFFF' } };
@@ -102,26 +103,33 @@ export async function exportTimetableMultiSheetsExcel(
   wsRecap.getCell('B6').value = `${planning.length} h / sem`;
   wsRecap.getCell('A7').value = 'Créneaux libres totaux :';
   wsRecap.getCell('B7').value = `${exceptions.creneauxLibresTotal} créneaux`;
+  wsRecap.getCell('A8').value = 'Option Reverse Dépassement :';
+  wsRecap.getCell('B8').value = dataset.constraints?.interdireTousDepassements
+    ? 'Interdiction stricte globale activée'
+    : dataset.constraints?.disabledOverages && dataset.constraints.disabledOverages.length > 0
+    ? `${dataset.constraints.disabledOverages.length} dépassement(s) neutralisé(s)`
+    : 'Règle souple par défaut (désactivable en cochant dans l\'app)';
 
-  for (let r = 3; r <= 7; r++) {
+  for (let r = 3; r <= 8; r++) {
     wsRecap.getCell(`A${r}`).font = { bold: true, color: { argb: 'FF334155' } };
   }
 
   // Tableau des exceptions
-  wsRecap.getCell('A9').value = 'Type d\'exception';
-  wsRecap.getCell('B9').value = 'Entité (Classe / Prof)';
-  wsRecap.getCell('C9').value = 'Jour';
-  wsRecap.getCell('D9').value = 'Description détaillée';
+  wsRecap.getCell('A10').value = 'Type d\'exception';
+  wsRecap.getCell('B10').value = 'Entité (Classe / Prof)';
+  wsRecap.getCell('C10').value = 'Jour';
+  wsRecap.getCell('D10').value = 'Description détaillée';
+  wsRecap.getCell('E10').value = 'Option Reverse Dépassement';
 
-  for (let c = 1; c <= 4; c++) {
-    const cell = wsRecap.getRow(9).getCell(c);
+  for (let c = 1; c <= 5; c++) {
+    const cell = wsRecap.getRow(10).getCell(c);
     cell.fill = headerColFill;
     cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
     cell.alignment = { vertical: 'middle' };
   }
-  wsRecap.getRow(9).height = 24;
+  wsRecap.getRow(10).height = 24;
 
-  let recapRowIndex = 10;
+  let recapRowIndex = 11;
   const allExceptions = [
     ...exceptions.exces2hJour,
     ...exceptions.heuresCoupees,
@@ -130,7 +138,7 @@ export async function exportTimetableMultiSheetsExcel(
   ];
 
   if (allExceptions.length === 0) {
-    wsRecap.mergeCells(`A${recapRowIndex}:D${recapRowIndex}`);
+    wsRecap.mergeCells(`A${recapRowIndex}:E${recapRowIndex}`);
     const cell = wsRecap.getCell(`A${recapRowIndex}`);
     cell.value = 'Aucune exception détectée : l\'emploi du temps est parfaitement compact et régulier !';
     cell.font = { italic: true, color: { argb: 'FF16A34A' } };
@@ -144,7 +152,23 @@ export async function exportTimetableMultiSheetsExcel(
       row.getCell(3).value = exc.jourNom;
       row.getCell(4).value = exc.description;
 
-      for (let c = 1; c <= 4; c++) {
+      if (exc.type === 'EXCES_2H_JOUR') {
+        const isAlreadyDisabled =
+          dataset.constraints?.interdireTousDepassements ||
+          (dataset.constraints?.disabledOverages &&
+            dataset.constraints.disabledOverages.includes(exc.id));
+        row.getCell(5).value = isAlreadyDisabled
+          ? '🛡️ Neutralisé (Contrainte dure solveur active)'
+          : 'Désactivable dans l\'application (Reverse Dépassement)';
+        row.getCell(5).font = {
+          color: { argb: isAlreadyDisabled ? 'FF7E22CE' : 'FF4338CA' },
+          bold: Boolean(isAlreadyDisabled),
+        };
+      } else {
+        row.getCell(5).value = '—';
+      }
+
+      for (let c = 1; c <= 5; c++) {
         row.getCell(c).border = borderThin;
         row.getCell(c).alignment = { vertical: 'middle' };
       }

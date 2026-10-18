@@ -126,6 +126,10 @@ export interface RulesOptions {
   maxHeuresParJourParMatiereClasse?: Record<string, 1 | 2 | 3>;
   /** Mode relâché : règles souples assouplies en cas d'infaisabilité */
   relaxedMode?: boolean;
+  /** Reverse Dépassement : liste des identifiants de dépassements désactivés (interdits strictement au solveur) */
+  disabledOverages?: string[];
+  /** Interdire strictement tous les dépassements de 2h/jour (contrainte dure globale) */
+  interdireTousDepassements?: boolean;
 }
 
 export interface ScoreBreakdown {

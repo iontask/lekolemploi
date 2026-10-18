@@ -214,8 +214,8 @@ export const ScenariosView: React.FC<ScenariosViewProps> = ({
       },
       (error) => {
         setSolvingScenarioId(null);
-        setSolverProgressMsg('');
-        alert(`Erreur de génération pour le scénario : ${error}`);
+        setSolverProgressMsg(`Erreur : ${error}`);
+        console.error('Erreur génération scénario:', error);
       }
     );
   };

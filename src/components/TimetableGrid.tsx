@@ -40,16 +40,27 @@ import {
   ChevronDown,
   ChevronUp,
   FileDown,
+  SlidersHorizontal,
+  ShieldCheck,
+  CheckSquare,
+  Square,
 } from 'lucide-react';
 import { PrintPdfModal } from './PrintPdfModal';
+import { ReverseOverageModal } from './ReverseOverageModal';
+import { getSubjectAbbreviation, getSubjectMeta } from '../utils/subjectFormatters';
 
 interface TimetableGridProps {
   dataset: ImportDataset;
   planning: Planning;
   resultInfo?: SolverResult | null;
-  onOpenGenerator: () => void;
+  onOpenGenerator: (
+    relaxedMode?: boolean,
+    disabledOverages?: string[],
+    interdireTousDepassements?: boolean
+  ) => void;
   onOpenGeneratorWithLocks?: (lockedAssignments: Affectation[]) => void;
   onUpdatePlanning?: (newPlanning: Planning) => void;
+  onSaveConstraints?: (constraints: import('../rules/types').RulesOptions) => void;
 }
 
 export const TimetableGrid: React.FC<TimetableGridProps> = ({
@@ -59,11 +70,25 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
   onOpenGenerator,
   onOpenGeneratorWithLocks,
   onUpdatePlanning,
+  onSaveConstraints,
 }) => {
   const [activeSubView, setActiveSubView] = useState<
     'asc' | 'individual' | 'subject' | 'teachers_matrix' | 'exceptions'
   >('individual');
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+  const [isReverseModalOpen, setIsReverseModalOpen] = useState(false);
+  const [selectedDisabledOverages, setSelectedDisabledOverages] = useState<string[]>(
+    () => dataset.constraints?.disabledOverages || []
+  );
+  const [interdireTousDepassements, setInterdireTousDepassements] = useState<boolean>(
+    () => dataset.constraints?.interdireTousDepassements || false
+  );
+
+  // Synchronisation avec dataset.constraints
+  useEffect(() => {
+    setSelectedDisabledOverages(dataset.constraints?.disabledOverages || []);
+    setInterdireTousDepassements(dataset.constraints?.interdireTousDepassements || false);
+  }, [dataset.constraints]);
 
   // --- HISTORIQUE ANNULER / RÉTABLIR ILLIMITÉ ---
   const [history, setHistory] = useState<Planning[]>([initialPlanning]);
@@ -333,10 +358,76 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
       await exportTimetableMultiSheetsExcel(dataset, currentPlanning);
     } catch (err) {
       console.error("Erreur lors de l'exportation Excel :", err);
-      alert("Une erreur est survenue lors de la génération du fichier Excel.");
+      setToast({
+        text: "Une erreur est survenue lors de l'exportation Excel.",
+        type: 'error',
+      });
     } finally {
       setIsExportingExcel(false);
     }
+  };
+
+  const handleToggleOverage = (excId: string) => {
+    if (interdireTousDepassements) return;
+    const next = selectedDisabledOverages.includes(excId)
+      ? selectedDisabledOverages.filter((id) => id !== excId)
+      : [...selectedDisabledOverages, excId];
+    setSelectedDisabledOverages(next);
+    if (onSaveConstraints) {
+      onSaveConstraints({
+        ...(dataset.constraints || {}),
+        disabledOverages: next,
+        interdireTousDepassements,
+      });
+    }
+  };
+
+  const handleSelectAllOverages = () => {
+    const allIds = exceptionsSummary.exces2hJour.map((e) => e.id);
+    setSelectedDisabledOverages(allIds);
+    if (onSaveConstraints) {
+      onSaveConstraints({
+        ...(dataset.constraints || {}),
+        disabledOverages: allIds,
+        interdireTousDepassements,
+      });
+    }
+  };
+
+  const handleDeselectAllOverages = () => {
+    setSelectedDisabledOverages([]);
+    setInterdireTousDepassements(false);
+    if (onSaveConstraints) {
+      onSaveConstraints({
+        ...(dataset.constraints || {}),
+        disabledOverages: [],
+        interdireTousDepassements: false,
+      });
+    }
+  };
+
+  const handleToggleInterdireTous = (val: boolean) => {
+    setInterdireTousDepassements(val);
+    if (onSaveConstraints) {
+      onSaveConstraints({
+        ...(dataset.constraints || {}),
+        disabledOverages: selectedDisabledOverages,
+        interdireTousDepassements: val,
+      });
+    }
+  };
+
+  const handleRelaunchWithReverse = (customOverages?: string[], customInterdireAll?: boolean) => {
+    const listToApply = customOverages ?? selectedDisabledOverages;
+    const allToApply = customInterdireAll ?? interdireTousDepassements;
+    if (onSaveConstraints) {
+      onSaveConstraints({
+        ...(dataset.constraints || {}),
+        disabledOverages: listToApply,
+        interdireTousDepassements: allToApply,
+      });
+    }
+    onOpenGenerator(false, listToApply, allToApply);
   };
 
   return (
@@ -496,9 +587,32 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
             <span>Imprimer / PDF Paysage</span>
           </button>
 
+          {/* Option Reverse Dépassement */}
+          <button
+            onClick={() => setIsReverseModalOpen(true)}
+            className={`inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg transition-colors shadow-2xs border ${
+              exceptionsSummary.exces2hJour.length > 0
+                ? 'bg-purple-50 text-purple-900 border-purple-300 hover:bg-purple-100'
+                : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+            }`}
+            title="Désactiver les dépassements de plus de 2h par jour et relancer le solveur"
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5 text-purple-600" />
+            <span>Reverse Dépassement</span>
+            {exceptionsSummary.exces2hJour.length > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-purple-200 text-purple-900 font-bold">
+                {interdireTousDepassements
+                  ? 'Tous'
+                  : selectedDisabledOverages.length > 0
+                  ? `${selectedDisabledOverages.length}/${exceptionsSummary.exces2hJour.length}`
+                  : exceptionsSummary.exces2hJour.length}
+              </span>
+            )}
+          </button>
+
           {/* Solveur complet */}
           <button
-            onClick={onOpenGenerator}
+            onClick={() => onOpenGenerator(false, selectedDisabledOverages, interdireTousDepassements)}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-lg transition-colors shadow-2xs"
           >
             <Sparkles className="w-3.5 h-3.5 text-amber-400" />
@@ -506,6 +620,53 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Alerte Reverse Dépassement si des dépassements de 2h/j sont présents dans l'output */}
+      {exceptionsSummary.exces2hJour.length > 0 && (
+        <div className="bg-gradient-to-r from-purple-50 via-indigo-50/80 to-purple-50 border border-purple-300/80 rounded-xl p-4 text-xs shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in duration-200">
+          <div className="flex items-start gap-2.5">
+            <div className="p-1.5 rounded-lg bg-purple-600 text-white shrink-0 mt-0.5 shadow-2xs">
+              <SlidersHorizontal className="w-4 h-4 text-purple-200" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-bold text-purple-950">
+                  Dépassements détectés dans l'output ({exceptionsSummary.exces2hJour.length} matière(s) &gt; 2 h/jour)
+                </span>
+                <span className="font-bold px-2 py-0.5 rounded-full bg-purple-200 text-purple-900 border border-purple-300 text-[10px]">
+                  {interdireTousDepassements
+                    ? 'Tous neutralisés (Règle dure stricte)'
+                    : selectedDisabledOverages.length > 0
+                    ? `${selectedDisabledOverages.length} neutralisé(s)`
+                    : 'Tolérés (règle souple)'}
+                </span>
+              </div>
+              <p className="text-purple-800 mt-0.5 text-[11px] leading-relaxed">
+                Ces dépassements sont également récapitulés sur l'onglet 1 du classeur Excel. Activez le <strong>Reverse Dépassement</strong> pour les neutraliser et relancer le solveur avec contrainte dure.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto">
+            <button
+              type="button"
+              onClick={() => setIsReverseModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-purple-900 bg-white hover:bg-purple-100 border border-purple-300 rounded-lg shadow-2xs transition-colors"
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5 text-purple-700" />
+              <span>Gérer ({selectedDisabledOverages.length}/{exceptionsSummary.exces2hJour.length})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleRelaunchWithReverse(exceptionsSummary.exces2hJour.map((e) => e.id), true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-white bg-purple-700 hover:bg-purple-800 rounded-lg shadow-2xs transition-colors"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-purple-300" />
+              <span>Tout interdire & Relancer</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Alerte si des matières ne sont pas affectées à 100 % avec appel à la recommandation IA */}
       {missingHours > 0 && (
@@ -531,7 +692,7 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
 
           <button
             type="button"
-            onClick={onOpenGenerator}
+            onClick={() => onOpenGenerator(true)}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-2xs transition-colors shrink-0 self-start sm:self-auto"
           >
             <Sparkles className="w-3.5 h-3.5 text-amber-300" />
@@ -724,6 +885,153 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
               </div>
             </div>
 
+            {/* Panneau interactif Reverse Dépassement */}
+            {exceptionsSummary.exces2hJour.length > 0 && (
+              <div className="bg-gradient-to-r from-purple-50 via-indigo-50/70 to-purple-50 border border-purple-200 rounded-xl p-5 space-y-4 shadow-2xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-xl bg-purple-600 text-white shadow-2xs">
+                      <SlidersHorizontal className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-sm font-bold text-purple-950">
+                          Option Reverse Dépassement : Neutraliser les dépassements de 2h/jour
+                        </h4>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-200 text-purple-900">
+                          {interdireTousDepassements
+                            ? 'Tous neutralisés'
+                            : `${selectedDisabledOverages.length}/${exceptionsSummary.exces2hJour.length} neutralisé(s)`}
+                        </span>
+                      </div>
+                      <p className="text-xs text-purple-800 mt-0.5">
+                        Cochez les dépassements ci-dessous pour les interdire au solveur HiGHS MIP (contrainte dure), puis relancez le solveur.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 self-start sm:self-auto">
+                    <label className="flex items-center gap-2 text-xs font-semibold text-purple-950 cursor-pointer bg-white px-3 py-1.5 rounded-lg border border-purple-300 shadow-2xs">
+                      <input
+                        type="checkbox"
+                        checked={interdireTousDepassements}
+                        onChange={(e) => handleToggleInterdireTous(e.target.checked)}
+                        className="rounded text-purple-600 focus:ring-purple-500 w-4 h-4"
+                      />
+                      <span>Interdire TOUS les dépassements</span>
+                    </label>
+                  </div>
+                </div>
+
+                {!interdireTousDepassements && (
+                  <div className="flex items-center justify-between text-xs pt-2 border-t border-purple-200/60">
+                    <span className="text-purple-900 font-medium">
+                      Sélection individuelle des matières / jours à bloquer :
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleSelectAllOverages}
+                        className="text-purple-800 hover:text-purple-950 font-semibold underline text-xs"
+                      >
+                        Tout cocher
+                      </button>
+                      <span className="text-purple-300">·</span>
+                      <button
+                        type="button"
+                        onClick={handleDeselectAllOverages}
+                        className="text-slate-600 hover:text-slate-800 font-medium underline text-xs"
+                      >
+                        Tout décocher
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Grille des dépassements avec cases à cocher */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                  {exceptionsSummary.exces2hJour.map((exc) => {
+                    const isChecked = interdireTousDepassements || selectedDisabledOverages.includes(exc.id);
+                    const meta = exc.matiere ? getSubjectMeta(exc.matiere) : null;
+                    const abbr = exc.matiere ? getSubjectAbbreviation(exc.matiere) : 'ENS';
+
+                    return (
+                      <label
+                        key={exc.id}
+                        onClick={() => !interdireTousDepassements && handleToggleOverage(exc.id)}
+                        className={`p-3 rounded-xl border flex items-start gap-3 cursor-pointer transition-all ${
+                          isChecked
+                            ? 'bg-purple-100/70 border-purple-300 shadow-2xs'
+                            : 'bg-white border-purple-100 hover:border-purple-300'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          disabled={interdireTousDepassements}
+                          onChange={() => handleToggleOverage(exc.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="mt-0.5 rounded text-purple-600 focus:ring-purple-500 w-4 h-4 cursor-pointer"
+                        />
+                        <div className="flex-1 space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span
+                              className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                meta?.badgeClass || 'bg-slate-100 text-slate-800'
+                              }`}
+                            >
+                              {abbr}
+                            </span>
+                            <span className="font-bold text-xs text-slate-900 font-mono">
+                              {exc.entiteNom}
+                            </span>
+                            <span className="text-xs text-slate-500 font-medium">· {exc.jourNom}</span>
+                            <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-200">
+                              {exc.creneaux?.length || 3} h
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-600 leading-tight">
+                            {exc.description}
+                          </p>
+                        </div>
+                        <div className="shrink-0">
+                          {isChecked ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-200 text-purple-900">
+                              <ShieldCheck className="w-3 h-3 text-purple-700" />
+                              <span>Interdit</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-600">
+                              Toléré
+                            </span>
+                          )}
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+
+                {/* Bouton de relance directe avec les dépassements désactivés */}
+                <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-purple-200/60">
+                  <span className="text-xs text-purple-900">
+                    {interdireTousDepassements
+                      ? 'Tous les dépassements seront convertis en contraintes dures au solveur.'
+                      : `${selectedDisabledOverages.length} dépassement(s) converti(s) en contrainte(s) dure(s).`}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleRelaunchWithReverse()}
+                    className="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-xs font-bold text-white bg-purple-700 hover:bg-purple-800 rounded-xl shadow-xs transition-colors self-stretch sm:self-auto"
+                  >
+                    <Sparkles className="w-4 h-4 text-purple-300" />
+                    <span>
+                      Relancer le solveur avec le ou les dépassement(s) désactivé(s)
+                    </span>
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Liste complète des exceptions */}
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
               <div className="p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
@@ -777,6 +1085,32 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
                           {exc.description}
                         </p>
                       </div>
+
+                      <div className="shrink-0 flex items-center gap-2">
+                        {exc.type === 'EXCES_2H_JOUR' && (
+                          <button
+                            type="button"
+                            onClick={() => handleToggleOverage(exc.id)}
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold transition-colors ${
+                              interdireTousDepassements || selectedDisabledOverages.includes(exc.id)
+                                ? 'bg-purple-100 text-purple-900 border border-purple-300'
+                                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={interdireTousDepassements || selectedDisabledOverages.includes(exc.id)}
+                              readOnly
+                              className="rounded text-purple-600 focus:ring-purple-500 w-3 h-3 pointer-events-none"
+                            />
+                            <span>
+                              {interdireTousDepassements || selectedDisabledOverages.includes(exc.id)
+                                ? 'Reverse Dépassement actif'
+                                : 'Désactiver ce dépassement'}
+                            </span>
+                          </button>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -793,6 +1127,43 @@ export const TimetableGrid: React.FC<TimetableGridProps> = ({
         dataset={dataset}
         planning={currentPlanning}
         activeSubView={activeSubView}
+      />
+
+      {/* Modal interactif Reverse Dépassement */}
+      <ReverseOverageModal
+        isOpen={isReverseModalOpen}
+        onClose={() => setIsReverseModalOpen(false)}
+        dataset={dataset}
+        planning={currentPlanning}
+        currentDisabledOverages={selectedDisabledOverages}
+        currentInterdireTous={interdireTousDepassements}
+        onRelaunchWithDisabledOverages={(disabledIds, interdireAll) => {
+          setSelectedDisabledOverages(disabledIds);
+          setInterdireTousDepassements(interdireAll);
+          if (onSaveConstraints) {
+            onSaveConstraints({
+              ...(dataset.constraints || {}),
+              disabledOverages: disabledIds,
+              interdireTousDepassements: interdireAll,
+            });
+          }
+          onOpenGenerator(false, disabledIds, interdireAll);
+        }}
+        onSavePreferences={(disabledIds, interdireAll) => {
+          setSelectedDisabledOverages(disabledIds);
+          setInterdireTousDepassements(interdireAll);
+          if (onSaveConstraints) {
+            onSaveConstraints({
+              ...(dataset.constraints || {}),
+              disabledOverages: disabledIds,
+              interdireTousDepassements: interdireAll,
+            });
+          }
+          setToast({
+            text: 'Préférences Reverse Dépassement enregistrées.',
+            type: 'success',
+          });
+        }}
       />
     </div>
   );
