@@ -335,6 +335,136 @@ export function buildLpModel(
     }
   }
 
+  // 5. Contraintes spécifiques enseignants (Anti-1h demi-journée & Regroupement / Anti-trous)
+  const profsEviter1hList = config.profsEviter1hDemiJournee || [];
+  const profsAntiTrousList = config.profsRegrouperHeuresAntiTrous || [];
+
+  if (profsEviter1hList.length > 0 || profsAntiTrousList.length > 0) {
+    const profsEviter1hSet = new Set(profsEviter1hList);
+    const profsAntiTrousSet = new Set(profsAntiTrousList);
+
+    for (let pIdx = 0; pIdx < teachers.length; pIdx++) {
+      const prof = teachers[pIdx];
+      const checkEviter1h = profsEviter1hSet.has(prof.id);
+      const checkAntiTrous = profsAntiTrousSet.has(prof.id);
+      if (!checkEviter1h && !checkAntiTrous) continue;
+
+      // Unités associées à cet enseignant
+      const profUnitIndices: number[] = [];
+      for (let uIdx = 0; uIdx < unites.length; uIdx++) {
+        if (unites[uIdx].teacherId === prof.id) {
+          profUnitIndices.push(uIdx);
+        }
+      }
+      if (profUnitIndices.length === 0) continue;
+
+      // Pour chaque créneau s, les variables associées à ce prof : sum_{u of prof} x[u, s]
+      const profXTermsForSlot = (s: number): string[] => {
+        const terms: string[] = [];
+        for (const uIdx of profUnitIndices) {
+          const vs = validSlotsPerUnit.get(uIdx) || [];
+          if (vs.includes(s)) {
+            terms.push(xVarName(uIdx, s));
+          }
+        }
+        return terms;
+      };
+
+      for (let j = 0; j < semaine.jours.length; j++) {
+        const totalSlotsOnDay = semaine.creneauxParJour[j] || 7;
+        const daySlotIndices: number[] = [];
+        for (let s = 0; s < totalSlots; s++) {
+          if (getSlotCoordinates(s, semaine).jourIndex === j) {
+            daySlotIndices.push(s);
+          }
+        }
+
+        // (5.A) Éviter 1h isolée en demi-journée (Matin et Après-midi)
+        // Formulation Goal Programming avec variable de pénalité slack pour garantir la faisabilité
+        // tout en éliminant impérativement les venues pour 1h isolée
+        if (checkEviter1h) {
+          const matinSlots = daySlotIndices.filter((s) => getSlotCoordinates(s, semaine).rangHeure < 4);
+          const apremSlots =
+            totalSlotsOnDay > 4
+              ? daySlotIndices.filter((s) => getSlotCoordinates(s, semaine).rangHeure >= 4)
+              : [];
+
+          const halfDays = [
+            { id: 'matin', slots: matinSlots },
+            { id: 'aprem', slots: apremSlots },
+          ].filter((hd) => hd.slots.length > 0);
+
+          for (const hd of halfDays) {
+            const allTerms: string[] = [];
+            for (const s of hd.slots) {
+              allTerms.push(...profXTermsForSlot(s));
+            }
+
+            if (allTerms.length === 1) {
+              // Si 1 seule heure possible dans la demi-journée, pénalité forte de 4000
+              const slack = `slack_1h_p${pIdx}_j${j}_${hd.id}`;
+              allGenerals.push(slack);
+              bounds.push(`0 <= ${slack} <= 1`);
+              objTerms.push(`4000 ${slack}`);
+              constraints.push(`no_single_1h_p${pIdx}_j${j}_${hd.id}: ${allTerms[0]} - ${slack} <= 0`);
+            } else if (allTerms.length >= 2) {
+              const yVar = `y_p${pIdx}_j${j}_${hd.id}`;
+              allBinaries.push(yVar);
+
+              // yVar = 1 si au moins un créneau est occupé dans la demi-journée
+              constraints.push(
+                `min2h_upper_p${pIdx}_j${j}_${hd.id}: ${allTerms.join(' + ')} - ${hd.slots.length} ${yVar} <= 0`
+              );
+
+              // Minimum 2h si présent : sum - 2 yVar + slack >= 0
+              // Slack a un coût très dissuasif de 4000 (1500 en mode relâché) pour interdire 1h isolée
+              const slack = `slack_1h_p${pIdx}_j${j}_${hd.id}`;
+              allGenerals.push(slack);
+              bounds.push(`0 <= ${slack} <= 1`);
+              const penalty1h = config.relaxedMode ? 1500 : 4000;
+              objTerms.push(`${penalty1h} ${slack}`);
+              constraints.push(
+                `min2h_lower_p${pIdx}_j${j}_${hd.id}: ${allTerms.join(' + ')} - 2 ${yVar} + ${slack} >= 0`
+              );
+            }
+          }
+        }
+
+        // (5.B) Regrouper les heures au plus et éviter les trous le même jour
+        if (checkAntiTrous && daySlotIndices.length >= 3) {
+          const activeSlots = daySlotIndices.filter((s) => profXTermsForSlot(s).length > 0);
+          if (activeSlots.length >= 3) {
+            for (let i = 0; i < activeSlots.length; i++) {
+              for (let m = i + 1; m < activeSlots.length; m++) {
+                for (let k = m + 1; k < activeSlots.length; k++) {
+                  const s1 = activeSlots[i];
+                  const mid = activeSlots[m];
+                  const s2 = activeSlots[k];
+
+                  const terms1 = profXTermsForSlot(s1);
+                  const termsMid = profXTermsForSlot(mid);
+                  const terms2 = profXTermsForSlot(s2);
+                  if (terms1.length === 0 || termsMid.length === 0 || terms2.length === 0) continue;
+
+                  const trouVar = `trou_p${pIdx}_j${j}_s${s1}_${mid}_${s2}`;
+                  allBinaries.push(trouVar);
+                  const penaltyTrou = config.relaxedMode ? 350 : 800;
+                  objTerms.push(`${penaltyTrou} ${trouVar}`);
+
+                  // Syntaxe CPLEX propre : posTerms - negTerms - trouVar <= 1
+                  const posPart = [...terms1, ...terms2].join(' + ');
+                  const negPart = termsMid.map((t) => `- ${t}`).join(' ');
+                  const left = `${posPart} ${negPart} - ${trouVar}`;
+                  constraints.push(`anti_trou_p${pIdx}_j${j}_${s1}_${mid}_${s2}: ${left} <= 1`);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
   // Fixation des cours verrouillés (x[u, s] = 1)
   for (const locked of lockedAssignments) {
     const uIdx = unites.findIndex((u) => u.id === locked.uniteId);

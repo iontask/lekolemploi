@@ -44,6 +44,7 @@ import {
 } from '../rules/types';
 import { SubjectHourlyConstraintsManager } from './SubjectHourlyConstraintsManager';
 import { BlockRulesMatrixGrid } from './BlockRulesMatrixGrid';
+import { TeacherConstraintsManager } from './TeacherConstraintsManager';
 
 interface ConstraintsPanelProps {
   dataset: ImportDataset;
@@ -512,11 +513,27 @@ export const ConstraintsPanel: React.FC<ConstraintsPanelProps> = ({
           />
         </div>
 
-        {/* SECTION 3 : PLAFONDS & MAX D'HEURES PAR JOUR */}
+        {/* SECTION 3 : OPTIMISATION PAR ENSEIGNANT (ÉVITER 1H EN DEMI-JOURNÉE & REGROUPEMENT SANS TROUS) */}
+        <div id="section-teacher-constraints" className="col-span-1 lg:col-span-2">
+          <TeacherConstraintsManager
+            teachers={teachers}
+            unites={unitesList}
+            classes={classes}
+            options={options}
+            onChangeOptions={setOptions}
+            onSave={() => {
+              onSaveConstraints(options, unitesList);
+              setSavedSuccess(true);
+              setTimeout(() => setSavedSuccess(false), 3500);
+            }}
+          />
+        </div>
+
+        {/* SECTION 4 : PLAFONDS & MAX D'HEURES PAR JOUR */}
         <div className="p-5 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-4">
           <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
             <Clock className="w-4 h-4 text-emerald-600" />
-            <h2 className="text-sm font-bold text-slate-900">3. Plafonds & Volumes journaliers</h2>
+            <h2 className="text-sm font-bold text-slate-900">4. Plafonds & Volumes journaliers</h2>
           </div>
 
           <div className="space-y-3.5">
@@ -586,11 +603,11 @@ export const ConstraintsPanel: React.FC<ConstraintsPanelProps> = ({
           </div>
         </div>
 
-        {/* SECTION 4 : PÉNALITÉS ET RÈGLES SOUPLES */}
+        {/* SECTION 5 : PÉNALITÉS ET RÈGLES SOUPLES */}
         <div className="p-5 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-4">
           <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
             <Shield className="w-4 h-4 text-amber-600" />
-            <h2 className="text-sm font-bold text-slate-900">4. Pondération des pénalités souples</h2>
+            <h2 className="text-sm font-bold text-slate-900">5. Pondération des pénalités souples</h2>
           </div>
           <p className="text-xs text-slate-600">
             Ajustez le coût des infractions aux règles de confort pédagogique pour orienter le solveur HiGHS :
@@ -683,12 +700,12 @@ export const ConstraintsPanel: React.FC<ConstraintsPanelProps> = ({
           </div>
         </div>
 
-        {/* SECTION 5 : CRÉNEAUX RÉSERVÉS PAR CLASSE */}
+        {/* SECTION 6 : CRÉNEAUX RÉSERVÉS PAR CLASSE */}
         <div className="p-5 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-4">
           <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
             <CalendarCheck2 className="w-4 h-4 text-sky-600" />
             <h2 className="text-sm font-bold text-slate-900">
-              5. Créneaux réservés par classe (ex: 3h de contrôles en 2 Bac)
+              6. Créneaux réservés par classe (ex: 3h de contrôles en 2 Bac)
             </h2>
           </div>
           <p className="text-xs text-slate-600">
@@ -800,13 +817,13 @@ export const ConstraintsPanel: React.FC<ConstraintsPanelProps> = ({
         </div>
       </div>
 
-      {/* SECTION 6 : PLAGES INTERDITES INTERACTIVES (CLASSES OU PROFS) */}
+      {/* SECTION 7 : PLAGES INTERDITES INTERACTIVES (CLASSES OU PROFS) */}
       <div className="p-5 bg-white rounded-xl border border-slate-200 shadow-2xs space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2">
             <Ban className="w-4 h-4 text-rose-600" />
             <h2 className="text-sm font-bold text-slate-900">
-              6. Plages interdites personnalisées (par classe ou par prof)
+              7. Plages interdites personnalisées (par classe ou par prof)
             </h2>
           </div>
 

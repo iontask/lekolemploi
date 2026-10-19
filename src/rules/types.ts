@@ -38,7 +38,9 @@ export type ViolationType =
   | 'CRENEAU_RESERVE_VIOLATION'
   | 'PLAGE_INTERDITE_CLASSE'
   | 'PLAGE_INTERDITE_PROF'
-  | 'PLAFOND_PROF_DEPASSE';
+  | 'PLAFOND_PROF_DEPASSE'
+  | 'PROF_ISOLE_DEMI_JOURNEE'
+  | 'PROF_TROU_JOURNEE';
 
 export interface RuleViolation {
   type: ViolationType;
@@ -130,6 +132,10 @@ export interface RulesOptions {
   disabledOverages?: string[];
   /** Interdire strictement tous les dépassements de 2h/jour (contrainte dure globale) */
   interdireTousDepassements?: boolean;
+  /** Liste des IDs des enseignants pour lesquels il faut éviter une venue pour seulement 1h sur une demi-journée (minimum 2h si présent) */
+  profsEviter1hDemiJournee?: string[];
+  /** Liste des IDs des enseignants pour lesquels il faut regrouper au maximum les heures et éviter les trous / fenêtres */
+  profsRegrouperHeuresAntiTrous?: string[];
 }
 
 export interface ScoreBreakdown {
@@ -138,6 +144,8 @@ export interface ScoreBreakdown {
   penalitesNonConsecutif: number; // 15 par jour avec heures séparées
   coutCompacite: number; // rangHeure * 1 + rangJour * 0.3
   nombreViolationsDures: number;
+  penalitesProfIsoleDemiJournee?: number;
+  penalitesProfTrous?: number;
 }
 
 export interface CanPlaceResult {

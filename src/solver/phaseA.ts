@@ -175,6 +175,263 @@ function ejectionChainRepair(
 }
 
 /**
+ * Évalue le coût d'attribution d'un créneau pour un enseignant selon les contraintes
+ * spécifiques d'évitement d'une venue pour 1h en demi-journée et de regroupement anti-trous.
+ */
+function evaluateSlotForTeacher(
+  slot: number,
+  teacherId: string,
+  currentPlanning: Affectation[],
+  data: ScheduleData,
+  config: SolverConfig,
+  uniteMap: Map<string, Unite>
+): number {
+  const checkEviter1h = config.profsEviter1hDemiJournee?.includes(teacherId);
+  const checkAntiTrous = config.profsRegrouperHeuresAntiTrous?.includes(teacherId);
+  if (!checkEviter1h && !checkAntiTrous) return 0;
+
+  let bonusOrPenalty = 0;
+  const coords = getSlotCoordinates(slot, data.semaine);
+  const isMatin = coords.rangHeure < 4;
+
+  const profDayRangs: number[] = [];
+  const profHalfDayRangs: number[] = [];
+
+  for (const a of currentPlanning) {
+    const u = uniteMap.get(a.uniteId);
+    if (u?.teacherId === teacherId) {
+      const c = getSlotCoordinates(a.slot, data.semaine);
+      if (c.jourIndex === coords.jourIndex) {
+        profDayRangs.push(c.rangHeure);
+        if ((c.rangHeure < 4) === isMatin) {
+          profHalfDayRangs.push(c.rangHeure);
+        }
+      }
+    }
+  }
+
+  // (1) Contrainte : Éviter 1h isolée en demi-journée
+  if (checkEviter1h) {
+    if (profHalfDayRangs.length === 1) {
+      // Rejoint une heure isolée pour former au moins 2h : RÉCOMPENSE TRÈS FORTE
+      bonusOrPenalty -= 150.0;
+    } else if (profHalfDayRangs.length >= 2) {
+      // Déjà présent 2h ou plus : renforce la demi-journée
+      bonusOrPenalty -= 25.0;
+    } else {
+      // profHalfDayRangs.length === 0 :
+      if (profDayRangs.length === 0) {
+        // Faire venir le prof un jour où il n'a aucun cours pour 1h seulement : PÉNALITÉ MAXIMALE
+        bonusOrPenalty += 200.0;
+      } else {
+        // Présent l'autre demi-journée mais seulement 1h sur celle-ci : PÉNALITÉ FORTE
+        bonusOrPenalty += 120.0;
+      }
+    }
+  }
+
+  // (2) Contrainte : Regrouper au plus les heures et éviter les trous / fenêtres
+  if (checkAntiTrous && profDayRangs.length > 0) {
+    const isAdjacent = profDayRangs.some((r) => Math.abs(r - coords.rangHeure) === 1);
+    if (isAdjacent) {
+      // Immédiatement consécutif (sans trou) : RÉCOMPENSE TRÈS FORTE
+      bonusOrPenalty -= 120.0;
+    } else {
+      const minR = Math.min(...profDayRangs);
+      const maxR = Math.max(...profDayRangs);
+      if (coords.rangHeure > minR && coords.rangHeure < maxR) {
+        // Comble un trou existant entre deux cours : BONUS
+        bonusOrPenalty -= 90.0;
+      } else {
+        // Crée une fenêtre ou un trou : PÉNALITÉ PROPORTIONNELLE À LA DISTANCE
+        const dist = coords.rangHeure < minR ? minR - coords.rangHeure - 1 : coords.rangHeure - maxR - 1;
+        bonusOrPenalty += 60.0 * (dist + 1);
+      }
+    }
+  }
+
+  return bonusOrPenalty;
+}
+
+/**
+ * Post-traitement d'optimisation locale pour éliminer les violations d'1h isolée en demi-journée
+ * et compacter les cours consécutifs (anti-trous) pour les enseignants ciblés.
+ */
+export function compactAndRepairTeacherSchedules(
+  planning: Planning,
+  data: ScheduleData,
+  config: SolverConfig,
+  lockedAssignments: Affectation[] = []
+): void {
+  const eviter1hList = config.profsEviter1hDemiJournee || [];
+  const antiTrousList = config.profsRegrouperHeuresAntiTrous || [];
+  if (eviter1hList.length === 0 && antiTrousList.length === 0) return;
+
+  const lockedSet = new Set(lockedAssignments.map((l) => `${l.uniteId}_${l.slot}`));
+  const isLocked = (uniteId: string, slot: number) => lockedSet.has(`${uniteId}_${slot}`);
+
+  const uniteMap = new Map<string, Unite>(data.unites.map((u) => [u.id, u]));
+  const totalSlots = data.semaine.creneauxParJour.reduce((a, b) => a + b, 0);
+  const targetTeacherIds = Array.from(new Set([...eviter1hList, ...antiTrousList]));
+
+  for (let iteration = 0; iteration < 4; iteration++) {
+    let movedAny = false;
+
+    for (const profId of targetTeacherIds) {
+      const checkEviter1h = eviter1hList.includes(profId);
+      const checkAntiTrous = antiTrousList.includes(profId);
+
+      // (A) Résolution des trous (Anti-trous) : combler les créneaux creux
+      if (checkAntiTrous) {
+        for (let j = 0; j < data.semaine.jours.length; j++) {
+          const dayAssigns = planning.filter((a) => {
+            const u = uniteMap.get(a.uniteId);
+            return u?.teacherId === profId && getSlotCoordinates(a.slot, data.semaine).jourIndex === j;
+          });
+          if (dayAssigns.length < 2) continue;
+
+          dayAssigns.sort(
+            (a, b) =>
+              getSlotCoordinates(a.slot, data.semaine).rangHeure -
+              getSlotCoordinates(b.slot, data.semaine).rangHeure
+          );
+
+          for (let i = 0; i < dayAssigns.length - 1; i++) {
+            const a1 = dayAssigns[i];
+            const a2 = dayAssigns[i + 1];
+            const r1 = getSlotCoordinates(a1.slot, data.semaine).rangHeure;
+            const r2 = getSlotCoordinates(a2.slot, data.semaine).rangHeure;
+
+            if (r2 - r1 > 1) {
+              // Trou détecté entre r1 et r2
+              // Tentative 1 : rapprocher a2 vers r1 + 1
+              if (!isLocked(a2.uniteId, a2.slot)) {
+                const targetSlot = a1.slot + 1;
+                if (getSlotCoordinates(targetSlot, data.semaine).jourIndex === j) {
+                  const u2 = uniteMap.get(a2.uniteId)!;
+                  const idx = planning.indexOf(a2);
+                  if (idx >= 0) {
+                    planning.splice(idx, 1);
+                    if (canPlace(planning, u2, targetSlot, data, config).ok) {
+                      planning.push({ uniteId: a2.uniteId, slot: targetSlot });
+                      a2.slot = targetSlot;
+                      movedAny = true;
+                      break;
+                    } else {
+                      planning.push(a2);
+                    }
+                  }
+                }
+              }
+
+              // Tentative 2 : rapprocher a1 vers r2 - 1
+              if (!isLocked(a1.uniteId, a1.slot)) {
+                const targetSlot = a2.slot - 1;
+                if (getSlotCoordinates(targetSlot, data.semaine).jourIndex === j) {
+                  const u1 = uniteMap.get(a1.uniteId)!;
+                  const idx = planning.indexOf(a1);
+                  if (idx >= 0) {
+                    planning.splice(idx, 1);
+                    if (canPlace(planning, u1, targetSlot, data, config).ok) {
+                      planning.push({ uniteId: a1.uniteId, slot: targetSlot });
+                      a1.slot = targetSlot;
+                      movedAny = true;
+                      break;
+                    } else {
+                      planning.push(a1);
+                    }
+                  }
+                }
+              }
+            }
+          }
+          if (movedAny) break;
+        }
+      }
+
+      // (B) Éviter 1h isolée en demi-journée : déplacer vers un jour/demi-journée groupé
+      if (checkEviter1h) {
+        for (let j = 0; j < data.semaine.jours.length; j++) {
+          const dayAssigns = planning.filter((a) => {
+            const u = uniteMap.get(a.uniteId);
+            return u?.teacherId === profId && getSlotCoordinates(a.slot, data.semaine).jourIndex === j;
+          });
+          if (dayAssigns.length === 0) continue;
+
+          const matinAssigns = dayAssigns.filter(
+            (a) => getSlotCoordinates(a.slot, data.semaine).rangHeure < 4
+          );
+          const apremAssigns = dayAssigns.filter(
+            (a) => getSlotCoordinates(a.slot, data.semaine).rangHeure >= 4
+          );
+
+          const halfDayCases = [
+            { name: 'matin', assigns: matinAssigns },
+            { name: 'aprem', assigns: apremAssigns },
+          ];
+
+          for (const hd of halfDayCases) {
+            if (hd.assigns.length === 1) {
+              const isolated = hd.assigns[0];
+              if (isLocked(isolated.uniteId, isolated.slot)) continue;
+
+              const uIso = uniteMap.get(isolated.uniteId)!;
+              const planIdx = planning.indexOf(isolated);
+              if (planIdx < 0) continue;
+
+              planning.splice(planIdx, 1);
+              let fixed = false;
+
+              // Chercher les créneaux cibles qui ont déjà 1 heure de ce professeur
+              const preferredSlots = Array.from({ length: totalSlots }, (_, s) => s)
+                .filter((s) => {
+                  const c = getSlotCoordinates(s, data.semaine);
+                  const isM = c.rangHeure < 4;
+                  const existingCount = planning.filter((a) => {
+                    const u = uniteMap.get(a.uniteId);
+                    if (u?.teacherId !== profId) return false;
+                    const cA = getSlotCoordinates(a.slot, data.semaine);
+                    return cA.jourIndex === c.jourIndex && (cA.rangHeure < 4) === isM;
+                  }).length;
+                  return existingCount >= 1;
+                })
+                .sort((sA, sB) => {
+                  const cA = getSlotCoordinates(sA, data.semaine);
+                  const cB = getSlotCoordinates(sB, data.semaine);
+                  const hasAdjA = planning.some((a) => uniteMap.get(a.uniteId)?.teacherId === profId && Math.abs(a.slot - sA) === 1);
+                  const hasAdjB = planning.some((a) => uniteMap.get(a.uniteId)?.teacherId === profId && Math.abs(a.slot - sB) === 1);
+                  if (hasAdjA && !hasAdjB) return -1;
+                  if (!hasAdjA && hasAdjB) return 1;
+                  return cA.rangHeure - cB.rangHeure;
+                });
+
+              for (const candSlot of preferredSlots) {
+                if (canPlace(planning, uIso, candSlot, data, config).ok) {
+                  planning.push({ uniteId: uIso.id, slot: candSlot });
+                  isolated.slot = candSlot;
+                  fixed = true;
+                  movedAny = true;
+                  break;
+                }
+              }
+
+              if (!fixed) {
+                planning.push(isolated); // Restaurer si aucun déplacement n'a fonctionné
+              } else {
+                break;
+              }
+            }
+          }
+          if (movedAny) break;
+        }
+      }
+    }
+
+    if (!movedAny) break;
+  }
+}
+
+/**
  * Phase A : Heuristique constructive « Difficiles d'abord » avec backtracking borné,
  * passes adaptatives, chaînes d'éjection et diagnostic temps réel des goulots d'étranglement.
  */
@@ -188,6 +445,7 @@ export function solvePhaseAWithDiagnostics(
   const { teachers, classes, unites, semaine } = data;
   const totalSlots = semaine.creneauxParJour.reduce((a, b) => a + b, 0);
   const totalTargetHours = unites.reduce((sum, u) => sum + u.heures, 0);
+  const uniteMap = new Map<string, Unite>(unites.map((u) => [u.id, u]));
 
   const logs: GenerationLogEntry[] = [];
   const bottlenecks: GenerationBottleneck[] = [];
@@ -418,6 +676,19 @@ export function solvePhaseAWithDiagnostics(
                 const coords = getSlotCoordinates(s, semaine);
                 if (placedDays.has(coords.jourIndex)) return false;
                 return canPlace(currentPlanning, unite, s, data, config).ok;
+              })
+              .sort((sA, sB) => {
+                const cA = getSlotCoordinates(sA, semaine);
+                const cB = getSlotCoordinates(sB, semaine);
+                const bA = evaluateSlotForTeacher(sA, unite.teacherId, currentPlanning, data, config, uniteMap);
+                const bB = evaluateSlotForTeacher(sB, unite.teacherId, currentPlanning, data, config, uniteMap);
+                return (
+                  cA.rangHeure * 1.0 +
+                  cA.rangJour * 0.3 +
+                  bA -
+                  (cB.rangHeure * 1.0 + cB.rangJour * 0.3 + bB) +
+                  (attempt > 0 ? (Math.random() - 0.5) * 1.5 : 0)
+                );
               });
 
             if (singleCandidates.length > 0) {
@@ -489,10 +760,15 @@ export function solvePhaseAWithDiagnostics(
         candidatePairs.sort((pA, pB) => {
           const cA = getSlotCoordinates(pA.slot1, semaine);
           const cB = getSlotCoordinates(pB.slot1, semaine);
+
+          const bonusA = evaluateSlotForTeacher(pA.slot1, unite.teacherId, currentPlanning, data, config, uniteMap);
+          const bonusB = evaluateSlotForTeacher(pB.slot1, unite.teacherId, currentPlanning, data, config, uniteMap);
+
           return (
             cA.rangHeure * 1.0 +
-            cA.rangJour * 0.3 -
-            (cB.rangHeure * 1.0 + cB.rangJour * 0.3) +
+            cA.rangJour * 0.3 +
+            bonusA -
+            (cB.rangHeure * 1.0 + cB.rangJour * 0.3 + bonusB) +
             (attempt > 0 ? (Math.random() - 0.5) * 1.5 : 0)
           );
         });
@@ -541,15 +817,27 @@ export function solvePhaseAWithDiagnostics(
             .sort((sA, sB) => {
               const cA = getSlotCoordinates(sA, semaine);
               const cB = getSlotCoordinates(sB, semaine);
-              return cA.rangHeure - cB.rangHeure + (attempt > 0 ? (Math.random() - 0.5) * 1.5 : 0);
+              const bA = evaluateSlotForTeacher(sA, unite.teacherId, currentPlanning, data, config, uniteMap);
+              const bB = evaluateSlotForTeacher(sB, unite.teacherId, currentPlanning, data, config, uniteMap);
+              return (
+                cA.rangHeure * 1.0 +
+                cA.rangJour * 0.3 +
+                bA -
+                (cB.rangHeure * 1.0 + cB.rangJour * 0.3 + bB) +
+                (attempt > 0 ? (Math.random() - 0.5) * 1.5 : 0)
+              );
             });
 
           const candidates =
             singleCandidates.length > 0
               ? singleCandidates
-              : Array.from({ length: totalSlots }, (_, i) => i).filter(
-                  (s) => canPlace(currentPlanning, unite, s, data, config).ok
-                );
+              : Array.from({ length: totalSlots }, (_, i) => i)
+                  .filter((s) => canPlace(currentPlanning, unite, s, data, config).ok)
+                  .sort((sA, sB) => {
+                    const bA = evaluateSlotForTeacher(sA, unite.teacherId, currentPlanning, data, config, uniteMap);
+                    const bB = evaluateSlotForTeacher(sB, unite.teacherId, currentPlanning, data, config, uniteMap);
+                    return bA - bB;
+                  });
 
           if (candidates.length > 0) {
             const chosen = candidates[0];
@@ -567,11 +855,17 @@ export function solvePhaseAWithDiagnostics(
         const placedCount = currentPlanning.filter((a) => a.uniteId === unite.id).length;
         const missingForUnit = unite.heures - placedCount;
         for (let m = 0; m < missingForUnit; m++) {
-          for (let s = 0; s < totalSlots; s++) {
-            if (canPlace(currentPlanning, unite, s, data, config).ok) {
-              currentPlanning.push({ uniteId: unite.id, slot: s });
-              break;
-            }
+          const validSlots = Array.from({ length: totalSlots }, (_, s) => s)
+            .filter((s) => canPlace(currentPlanning, unite, s, data, config).ok)
+            .sort((sA, sB) => {
+              const cA = getSlotCoordinates(sA, semaine);
+              const cB = getSlotCoordinates(sB, semaine);
+              const bA = evaluateSlotForTeacher(sA, unite.teacherId, currentPlanning, data, config, uniteMap);
+              const bB = evaluateSlotForTeacher(sB, unite.teacherId, currentPlanning, data, config, uniteMap);
+              return cA.rangHeure * 1.0 + bA - (cB.rangHeure * 1.0 + bB);
+            });
+          if (validSlots.length > 0) {
+            currentPlanning.push({ uniteId: unite.id, slot: validSlots[0] });
           }
         }
       }
@@ -584,11 +878,17 @@ export function solvePhaseAWithDiagnostics(
         const placedCount = currentPlanning.filter((a) => a.uniteId === unite.id).length;
         const missingForUnit = unite.heures - placedCount;
         for (let m = 0; m < missingForUnit; m++) {
-          for (let s = 0; s < totalSlots; s++) {
-            if (canPlace(currentPlanning, unite, s, data, relaxedOpts).ok) {
-              currentPlanning.push({ uniteId: unite.id, slot: s });
-              break;
-            }
+          const validSlots = Array.from({ length: totalSlots }, (_, s) => s)
+            .filter((s) => canPlace(currentPlanning, unite, s, data, relaxedOpts).ok)
+            .sort((sA, sB) => {
+              const cA = getSlotCoordinates(sA, semaine);
+              const cB = getSlotCoordinates(sB, semaine);
+              const bA = evaluateSlotForTeacher(sA, unite.teacherId, currentPlanning, data, config, uniteMap);
+              const bB = evaluateSlotForTeacher(sB, unite.teacherId, currentPlanning, data, config, uniteMap);
+              return cA.rangHeure * 1.0 + bA - (cB.rangHeure * 1.0 + bB);
+            });
+          if (validSlots.length > 0) {
+            currentPlanning.push({ uniteId: unite.id, slot: validSlots[0] });
           }
         }
       }
@@ -605,6 +905,9 @@ export function solvePhaseAWithDiagnostics(
       ejectionChainRepair(currentPlanning, data, relaxedOpts, lockedAssignments);
     }
 
+    // Post-traitement d'optimisation locale pour compacter et supprimer les 1h isolées
+    compactAndRepairTeacherSchedules(currentPlanning, data, config, lockedAssignments);
+
     if (currentPlanning.length > bestPlacedCount) {
       bestPlacedCount = currentPlanning.length;
       bestPlanning = [...currentPlanning];
@@ -612,6 +915,7 @@ export function solvePhaseAWithDiagnostics(
 
     // Si 100% atteint, validation formelle
     if (currentPlanning.length === totalTargetHours) {
+      compactAndRepairTeacherSchedules(currentPlanning, data, config, lockedAssignments);
       const violations = verify(currentPlanning, data, config);
       const hardViolations = violations.filter((v) => v.severite === 'DURE');
       if (hardViolations.length === 0) {
@@ -637,6 +941,9 @@ export function solvePhaseAWithDiagnostics(
       ejectionChainRepair(bestPlanning, data, relaxedOpts, lockedAssignments);
     }
   }
+
+  // Optimisation finale des contraintes enseignants sur la meilleure solution
+  compactAndRepairTeacherSchedules(bestPlanning, data, config, lockedAssignments);
 
   if (bestPlanning.length === totalTargetHours) {
     const violations = verify(bestPlanning, data, config);

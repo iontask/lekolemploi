@@ -24,10 +24,16 @@ import {
   BookOpen,
   ShieldCheck,
   FileCode,
+  Cpu,
+  Key,
 } from 'lucide-react';
 
 import { SampleDatasetsDropdown } from './SampleDatasetsDropdown';
 import { SamplePreset } from '../services/sampleData';
+import {
+  loadAIProviderSettings,
+  AI_PROVIDERS_REGISTRY,
+} from '../services/aiProviderService';
 
 interface TopBarProps {
   activeView:
@@ -66,6 +72,7 @@ interface TopBarProps {
   hasDataset: boolean;
   hasPlanning: boolean;
   onReset: () => void;
+  onOpenAIProvider?: () => void;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -83,7 +90,26 @@ export const TopBar: React.FC<TopBarProps> = ({
   hasDataset,
   hasPlanning,
   onReset,
+  onOpenAIProvider,
 }) => {
+  const [providerSettings, setProviderSettings] = React.useState(loadAIProviderSettings);
+
+  React.useEffect(() => {
+    const handleSettingsChanged = (e: any) => {
+      if (e.detail) {
+        setProviderSettings(e.detail);
+      }
+    };
+    window.addEventListener('ai_provider_settings_changed', handleSettingsChanged);
+    return () => {
+      window.removeEventListener('ai_provider_settings_changed', handleSettingsChanged);
+    };
+  }, []);
+
+  const activeProviderInfo =
+    AI_PROVIDERS_REGISTRY[providerSettings.activeProviderId as keyof typeof AI_PROVIDERS_REGISTRY] ||
+    { shortName: providerSettings.configs[providerSettings.activeProviderId]?.name || 'IA' };
+
   const navItems = [
     { id: 'dashboard', label: 'Vue d\'ensemble', icon: LayoutDashboard },
     ...(hasPlanning
@@ -175,6 +201,21 @@ export const TopBar: React.FC<TopBarProps> = ({
               <SlidersHorizontal className="w-3.5 h-3.5 text-slate-600" />
               <span className="hidden sm:inline">Mappage</span>
             </button>
+
+            {onOpenAIProvider && (
+              <button
+                type="button"
+                onClick={onOpenAIProvider}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-indigo-200/90 bg-indigo-50 hover:bg-indigo-100 text-indigo-900 transition-colors shadow-2xs whitespace-nowrap"
+                title="Ajouter ou gérer vos clés d'API (Gemini, OpenAI, Claude, Groq, DeepSeek, Mistral, Ollama...)"
+              >
+                <Key className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                <span className="hidden sm:inline">Clés API :</span>
+                <span className="font-bold text-indigo-700 truncate max-w-[85px] sm:max-w-[110px]">
+                  {activeProviderInfo?.shortName || 'Gemini'}
+                </span>
+              </button>
+            )}
 
             {hasDataset ? (
               <>

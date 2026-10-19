@@ -6,6 +6,8 @@
 import { Classe, ImportDataset, Semaine, Teacher, Unite } from '../types';
 import { Planning, RulesOptions } from '../rules/types';
 import { getSlotCoordinates } from '../rules';
+import { AIAnalysisEngineMetadata, AIProviderConfig } from '../types/aiProvider';
+import { getActiveAIProviderConfig } from './aiProviderService';
 
 export interface UnplacedUnitDetail {
   uniteId: string;
@@ -35,6 +37,7 @@ export interface AIRecommendationResult {
   summary: string;
   predictedSuccessRate: number;
   recommendations: AIRecommendation[];
+  engineMetadata?: AIAnalysisEngineMetadata;
 }
 
 /**
@@ -122,15 +125,24 @@ export async function getAIConstraintRecommendations(params: {
   planning: Planning;
   currentConstraints: RulesOptions;
   diagnosticReports?: string[];
+  providerConfig?: AIProviderConfig;
 }): Promise<AIRecommendationResult> {
-  const { dataset, planning, currentConstraints, diagnosticReports = [] } = params;
+  const { dataset, planning, currentConstraints, diagnosticReports = [], providerConfig } = params;
   const analysis = extractUnplacedUnitsDetails(dataset, planning);
+  const activeConfig = providerConfig || getActiveAIProviderConfig();
 
   if (analysis.unplacedDetails.length === 0) {
     return {
       summary: "Toutes les matières sont 100 % affectées dans cet emploi du temps. Félicitations !",
       predictedSuccessRate: 100,
       recommendations: [],
+      engineMetadata: {
+        providerId: activeConfig.id,
+        providerName: activeConfig.name,
+        model: activeConfig.model,
+        latencyMs: 1,
+        isFallback: false,
+      },
     };
   }
 
@@ -148,6 +160,7 @@ export async function getAIConstraintRecommendations(params: {
           insertionRate: analysis.insertionRate,
           currentConstraints,
           diagnosticReports,
+          providerConfig: activeConfig,
           teachers: dataset.teachers.map((t) => ({ id: t.id, nom: t.nom, matiere: t.matiere })),
           classes: dataset.classes.map((c) => ({ id: c.id, nom: c.nom, niveau: c.niveau })),
           semaine: dataset.semaine,
@@ -166,7 +179,7 @@ export async function getAIConstraintRecommendations(params: {
   }
 
   // Fallback heuristique local
-  return generateLocalExpertRecommendations(analysis, currentConstraints);
+  return generateLocalExpertRecommendations(analysis, currentConstraints, activeConfig);
 }
 
 /**
@@ -174,7 +187,8 @@ export async function getAIConstraintRecommendations(params: {
  */
 function generateLocalExpertRecommendations(
   analysis: ReturnType<typeof extractUnplacedUnitsDetails>,
-  currentConstraints: RulesOptions
+  currentConstraints: RulesOptions,
+  activeConfig?: AIProviderConfig
 ): AIRecommendationResult {
   const recs: AIRecommendation[] = [];
   const missingTotal = analysis.missingHours;
@@ -277,5 +291,16 @@ function generateLocalExpertRecommendations(
     summary: `Diagnostic expert : ${missingTotal} heure(s) non affectée(s) pour ${analysis.unplacedDetails.length} unité(s) (${analysis.insertionRate}% d'insertion). La relaxation ciblée des contraintes ci-dessous permet au solveur d'atteindre un taux d'insertion de 100 %.`,
     predictedSuccessRate: 100,
     recommendations: recs,
+    engineMetadata: {
+      providerId: activeConfig?.id || 'heuristic',
+      providerName: activeConfig?.name || 'Heuristique Experte Locale',
+      model: activeConfig?.model || 'Règles expertes',
+      latencyMs: 5,
+      isFallback: activeConfig?.id !== 'heuristic',
+      fallbackReason:
+        activeConfig?.id !== 'heuristic'
+          ? "Serveur indisponible ou clé non configurée, bascule automatique sur l'heuristique"
+          : undefined,
+    },
   };
 }

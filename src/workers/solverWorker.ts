@@ -7,7 +7,7 @@ import loadHighs from 'highs';
 import { score, verify } from '../rules';
 import { Planning } from '../rules/types';
 import { buildLpModel } from '../solver/lpModelBuilder';
-import { solvePhaseAWithDiagnostics } from '../solver/phaseA';
+import { compactAndRepairTeacherSchedules, solvePhaseAWithDiagnostics } from '../solver/phaseA';
 import {
   GenerationBottleneck,
   GenerationLogEntry,
@@ -269,6 +269,9 @@ self.onmessage = async (e: MessageEvent<WorkerInMessage>) => {
         qualityLabel = 'Heuristique Phase A conservée (HiGHS sans solution)';
         addWorkerLog('INFO', `HiGHS sans solution réalisable (${highsStatus}). Planning Phase A conservé.`, 'PHASE_B');
       }
+
+      // Optimisation finale des contraintes enseignants sur le planning retenu
+      compactAndRepairTeacherSchedules(finalPlanning, data, config, lockedAssignments);
 
       const finalViolations = verify(finalPlanning, data, config);
       const finalScore = score(finalPlanning, data, config);

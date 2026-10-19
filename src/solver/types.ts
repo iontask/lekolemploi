@@ -59,6 +59,10 @@ export interface SolverConfig {
   disabledOverages?: string[];
   /** Interdire strictement tous les dépassements de 2h/jour (contrainte dure globale) */
   interdireTousDepassements?: boolean;
+  /** Liste des IDs des enseignants pour lesquels il faut éviter une venue pour seulement 1h sur une demi-journée */
+  profsEviter1hDemiJournee?: string[];
+  /** Liste des IDs des enseignants pour lesquels il faut regrouper au maximum les heures et éviter les trous / fenêtres */
+  profsRegrouperHeuresAntiTrous?: string[];
 }
 
 export const DEFAULT_SOLVER_CONFIG: SolverConfig = {
@@ -86,6 +90,8 @@ export const DEFAULT_SOLVER_CONFIG: SolverConfig = {
   relaxedMode: false,
   disabledOverages: [],
   interdireTousDepassements: false,
+  profsEviter1hDemiJournee: [],
+  profsRegrouperHeuresAntiTrous: [],
 };
 
 export type LogSeverity = 'INFO' | 'SUCCESS' | 'WARNING' | 'BOTTLENECK';

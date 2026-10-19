@@ -22,6 +22,7 @@ import { MappingModal } from './components/MappingModal';
 import { GenerationModal } from './components/GenerationModal';
 import { ProjectManagerModal } from './components/ProjectManagerModal';
 import { ResetConfirmModal } from './components/ResetConfirmModal';
+import { AIProviderModal } from './components/AIProviderModal';
 import { Planning, RulesOptions } from './rules/types';
 import { SolverConfig, SolverResult } from './solver/types';
 import { ScheduleScenario } from './types/scenarios';
@@ -54,6 +55,7 @@ export function App() {
   const [isGenerationOpen, setIsGenerationOpen] = useState(false);
   const [isProjectManagerOpen, setIsProjectManagerOpen] = useState(false);
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
+  const [isAIProviderOpen, setIsAIProviderOpen] = useState(false);
   const [isRelaxedModeForGen, setIsRelaxedModeForGen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -333,6 +335,7 @@ export function App() {
         hasDataset={dataset !== null}
         hasPlanning={Boolean(dataset?.planning && dataset.planning.length > 0)}
         onReset={handleOpenResetConfirm}
+        onOpenAIProvider={() => setIsAIProviderOpen(true)}
       />
 
       {/* Contenu principal */}
@@ -413,8 +416,18 @@ export function App() {
           initialRelaxedMode={isRelaxedModeForGen}
           initialDisabledOverages={disabledOveragesForGen}
           initialInterdireTousDepassements={interdireTousDepassementsForGen}
+          onOpenAIProviderModal={() => setIsAIProviderOpen(true)}
         />
       )}
+
+      {/* Modal de Configuration des AI Providers & Moteurs Externes */}
+      <AIProviderModal
+        isOpen={isAIProviderOpen}
+        onClose={() => setIsAIProviderOpen(false)}
+        onProviderChanged={(activeConfig) => {
+          addToast(`Moteur IA actif : ${activeConfig.name} (${activeConfig.model})`, 'success');
+        }}
+      />
 
       {/* Modal de Confirmation de Réinitialisation */}
       <ResetConfirmModal

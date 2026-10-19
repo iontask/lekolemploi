@@ -51,6 +51,7 @@ interface GenerationModalProps {
   initialRelaxedMode?: boolean;
   initialDisabledOverages?: string[];
   initialInterdireTousDepassements?: boolean;
+  onOpenAIProviderModal?: () => void;
 }
 
 export const GenerationModal: React.FC<GenerationModalProps> = ({
@@ -63,6 +64,7 @@ export const GenerationModal: React.FC<GenerationModalProps> = ({
   initialRelaxedMode = false,
   initialDisabledOverages,
   initialInterdireTousDepassements,
+  onOpenAIProviderModal,
 }) => {
   const [config, setConfig] = useState<SolverConfig>(() => ({
     ...DEFAULT_SOLVER_CONFIG,
@@ -623,6 +625,7 @@ export const GenerationModal: React.FC<GenerationModalProps> = ({
                   onApplyPatchAndRelaunch={handleApplyPatchAndRelaunch}
                   diagnosticReports={diagnostic.detailedReports}
                   isSolving={isSolving}
+                  onOpenAIProviderModal={onOpenAIProviderModal}
                 />
               )}
             </div>

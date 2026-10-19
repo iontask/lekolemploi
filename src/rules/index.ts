@@ -40,6 +40,8 @@ export const DEFAULT_RULES_OPTIONS: Required<RulesOptions> = {
   relaxedMode: false,
   disabledOverages: [],
   interdireTousDepassements: false,
+  profsEviter1hDemiJournee: [],
+  profsRegrouperHeuresAntiTrous: [],
 };
 
 /** Plages horaires standard de 1h chacune (7 créneaux lundi-jeudi, 4 créneaux vendredi) */
@@ -805,6 +807,90 @@ export function verify(
     }
   }
 
+  // 6. Contraintes spécifiques enseignants : Éviter 1h en demi-journée & Regroupement / Anti-trous
+  const eviter1hSet = new Set(options.profsEviter1hDemiJournee || []);
+  const antiTrousSet = new Set(options.profsRegrouperHeuresAntiTrous || []);
+
+  if (eviter1hSet.size > 0 || antiTrousSet.size > 0) {
+    for (const prof of data.teachers) {
+      const checkEviter1h = eviter1hSet.has(prof.id);
+      const checkAntiTrous = antiTrousSet.has(prof.id);
+      if (!checkEviter1h && !checkAntiTrous) continue;
+
+      const profSlots = planning
+        .filter((a) => {
+          const u = uniteMap.get(a.uniteId);
+          return u?.teacherId === prof.id;
+        })
+        .map((a) => a.slot);
+
+      if (profSlots.length === 0) continue;
+
+      for (let j = 0; j < data.semaine.jours.length; j++) {
+        const jourNom = data.semaine.jours[j] || `Jour ${j + 1}`;
+        const daySlots = profSlots.filter((s) => getSlotCoordinates(s, data.semaine).jourIndex === j);
+        if (daySlots.length === 0) continue;
+
+        // (6.A) Éviter de faire venir le professeur pour 1h seulement en demi-journée
+        if (checkEviter1h) {
+          const totalSlotsOnDay = data.semaine.creneauxParJour[j] || 7;
+          // Demi-journée Matin : créneaux de rang 0 à 3 (C1 à C4)
+          const matinSlots = daySlots.filter((s) => getSlotCoordinates(s, data.semaine).rangHeure < 4);
+          if (matinSlots.length === 1) {
+            const coords = getSlotCoordinates(matinSlots[0], data.semaine);
+            violations.push({
+              type: 'PROF_ISOLE_DEMI_JOURNEE',
+              severite: 'SOUPLE',
+              message: `L'enseignant(e) ${prof.nom} ne vient que pour 1 heure le ${jourNom} matin (C${coords.creneauNumero}), ce qui enfreint la contrainte d'éviter les déplacements pour 1h en demi-journée.`,
+              profId: prof.id,
+              profNom: prof.nom,
+              jourNom,
+            });
+          }
+
+          // Demi-journée Après-midi : créneaux de rang 4+ (C5 à C7, si la journée a plus de 4 créneaux)
+          if (totalSlotsOnDay > 4) {
+            const apresMidiSlots = daySlots.filter((s) => getSlotCoordinates(s, data.semaine).rangHeure >= 4);
+            if (apresMidiSlots.length === 1) {
+              const coords = getSlotCoordinates(apresMidiSlots[0], data.semaine);
+              violations.push({
+                type: 'PROF_ISOLE_DEMI_JOURNEE',
+                severite: 'SOUPLE',
+                message: `L'enseignant(e) ${prof.nom} ne vient que pour 1 heure le ${jourNom} après-midi (C${coords.creneauNumero}), ce qui enfreint la contrainte d'éviter les déplacements pour 1h en demi-journée.`,
+                profId: prof.id,
+                profNom: prof.nom,
+                jourNom,
+              });
+            }
+          }
+        }
+
+        // (6.B) Regrouper au plus les heures et éviter les trous / créneaux creux
+        if (checkAntiTrous && daySlots.length >= 2) {
+          const rangs = daySlots.map((s) => getSlotCoordinates(s, data.semaine).rangHeure).sort((a, b) => a - b);
+          const minRang = rangs[0];
+          const maxRang = rangs[rangs.length - 1];
+          const trous: number[] = [];
+          for (let r = minRang + 1; r < maxRang; r++) {
+            if (!rangs.includes(r)) {
+              trous.push(r + 1);
+            }
+          }
+          if (trous.length > 0) {
+            violations.push({
+              type: 'PROF_TROU_JOURNEE',
+              severite: 'SOUPLE',
+              message: `L'enseignant(e) ${prof.nom} a ${trous.length} créneau(x) creux d'attente (trou) le ${jourNom} (C${trous.join(', C')}), les heures ne sont pas regroupées au maximum.`,
+              profId: prof.id,
+              profNom: prof.nom,
+              jourNom,
+            });
+          }
+        }
+      }
+    }
+  }
+
   return violations;
 }
 
@@ -894,14 +980,20 @@ export function score(
   // Arrondi compacité à 2 décimales pour propreté
   coutCompacite = Math.round(coutCompacite * 100) / 100;
 
-  // Calcul du nombre de violations dures
+  // Calcul du nombre de violations dures et pénalités souples enseignants
   const violations = verify(planning, data, options);
   const nombreViolationsDures = violations.filter((v) => v.severite === 'DURE').length;
+  const profsIsoleesCount = violations.filter((v) => v.type === 'PROF_ISOLE_DEMI_JOURNEE').length;
+  const profsTrousCount = violations.filter((v) => v.type === 'PROF_TROU_JOURNEE').length;
+  const penalitesProfIsoleDemiJournee = profsIsoleesCount * 75;
+  const penalitesProfTrous = profsTrousCount * 50;
 
   const total =
     penalitesExcesJour +
     penalitesNonConsecutif +
     coutCompacite +
+    penalitesProfIsoleDemiJournee +
+    penalitesProfTrous +
     nombreViolationsDures * 10000;
 
   return {
@@ -910,6 +1002,8 @@ export function score(
     penalitesNonConsecutif,
     coutCompacite,
     nombreViolationsDures,
+    penalitesProfIsoleDemiJournee,
+    penalitesProfTrous,
   };
 }
 
