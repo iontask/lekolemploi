@@ -93,13 +93,19 @@ export const TeacherConstraintsManager: React.FC<TeacherConstraintsManagerProps>
     return Array.from(set).sort();
   }, [teachers]);
 
+  const triggerUpdate = (newOpts: RulesOptions) => {
+    onChangeOptions(newOpts);
+    setJustSaved(true);
+    setTimeout(() => setJustSaved(false), 2500);
+  };
+
   // Basculer la contrainte "Éviter 1h demi-journée" pour un enseignant
   const handleToggleEviter1h = (teacherId: string) => {
     const nextList = eviter1hSet.has(teacherId)
       ? eviter1hList.filter((id) => id !== teacherId)
       : [...eviter1hList, teacherId];
 
-    onChangeOptions({
+    triggerUpdate({
       ...options,
       profsEviter1hDemiJournee: nextList,
     });
@@ -111,7 +117,7 @@ export const TeacherConstraintsManager: React.FC<TeacherConstraintsManagerProps>
       ? antiTrousList.filter((id) => id !== teacherId)
       : [...antiTrousList, teacherId];
 
-    onChangeOptions({
+    triggerUpdate({
       ...options,
       profsRegrouperHeuresAntiTrous: nextList,
     });
@@ -130,7 +136,7 @@ export const TeacherConstraintsManager: React.FC<TeacherConstraintsManagerProps>
       nextAntiTrous = nextAntiTrous.filter((id) => id !== teacherId);
     }
 
-    onChangeOptions({
+    triggerUpdate({
       ...options,
       profsEviter1hDemiJournee: nextEviter,
       profsRegrouperHeuresAntiTrous: nextAntiTrous,
@@ -152,7 +158,7 @@ export const TeacherConstraintsManager: React.FC<TeacherConstraintsManagerProps>
       nextList = eviter1hList.filter((id) => !targetTeachers.includes(id));
     }
 
-    onChangeOptions({
+    triggerUpdate({
       ...options,
       profsEviter1hDemiJournee: nextList,
     });
@@ -169,7 +175,7 @@ export const TeacherConstraintsManager: React.FC<TeacherConstraintsManagerProps>
       nextList = antiTrousList.filter((id) => !targetTeachers.includes(id));
     }
 
-    onChangeOptions({
+    triggerUpdate({
       ...options,
       profsRegrouperHeuresAntiTrous: nextList,
     });
@@ -178,7 +184,7 @@ export const TeacherConstraintsManager: React.FC<TeacherConstraintsManagerProps>
   // Activer les deux pour tous les enseignants
   const handleBulkActivateBoth = () => {
     const allIds = teachers.map((t) => t.id);
-    onChangeOptions({
+    triggerUpdate({
       ...options,
       profsEviter1hDemiJournee: [...allIds],
       profsRegrouperHeuresAntiTrous: [...allIds],
@@ -187,7 +193,7 @@ export const TeacherConstraintsManager: React.FC<TeacherConstraintsManagerProps>
 
   // Tout désactiver
   const handleBulkDeactivateAll = () => {
-    onChangeOptions({
+    triggerUpdate({
       ...options,
       profsEviter1hDemiJournee: [],
       profsRegrouperHeuresAntiTrous: [],

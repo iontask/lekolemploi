@@ -23,6 +23,9 @@ import {
   ChevronUp,
   AlertCircle,
   Info,
+  Users,
+  Layers,
+  ShieldCheck,
 } from 'lucide-react';
 import { ImportDataset } from '../types';
 import { Planning } from '../rules/types';
@@ -89,6 +92,7 @@ export const GenerationModal: React.FC<GenerationModalProps> = ({
   const [logSearchQuery, setLogSearchQuery] = useState('');
   const [isCopied, setIsCopied] = useState(false);
   const [showOveragesList, setShowOveragesList] = useState(false);
+  const [showTeacherConstraintsList, setShowTeacherConstraintsList] = useState(false);
 
   const detectedOverages = useMemo(() => {
     if (!dataset.planning || dataset.planning.length === 0) return [];
@@ -105,7 +109,10 @@ export const GenerationModal: React.FC<GenerationModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setConfig((prev) => ({
+        ...DEFAULT_SOLVER_CONFIG,
+        ...(dataset.constraints || {}),
         ...prev,
+        ...(dataset.constraints || {}),
         relaxedMode: initialRelaxedMode,
         disabledOverages:
           initialDisabledOverages ?? dataset.constraints?.disabledOverages ?? prev.disabledOverages ?? [],
@@ -130,6 +137,18 @@ export const GenerationModal: React.FC<GenerationModalProps> = ({
   const totalRequiredHours = useMemo(
     () => dataset.unites.reduce((sum, u) => sum + u.heures, 0),
     [dataset]
+  );
+
+  const teacherMap = useMemo(
+    () => new Map(dataset.teachers.map((t) => [t.id, t])),
+    [dataset.teachers]
+  );
+
+  const eviter1hIds = config.profsEviter1hDemiJournee || [];
+  const antiTrousIds = config.profsRegrouperHeuresAntiTrous || [];
+  const configuredTeacherIds = useMemo(
+    () => Array.from(new Set([...eviter1hIds, ...antiTrousIds])),
+    [eviter1hIds, antiTrousIds]
   );
   const resultPlacedHours = result?.planning?.length || 0;
   const resultMissingHours = Math.max(0, totalRequiredHours - resultPlacedHours);
@@ -1080,6 +1099,127 @@ export const GenerationModal: React.FC<GenerationModalProps> = ({
                       >
                         Réinitialiser (tout autoriser)
                       </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Encadré d'optimisation par Enseignant (Anti-trous & Éviter 1h demi-journée) */}
+                <div className="bg-teal-50/60 p-3.5 rounded-xl border border-teal-200/80 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Users className="w-4 h-4 text-teal-700" />
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-teal-950">
+                            Optimisation Enseignants (Regroupement anti-trous & Éviter 1h)
+                          </span>
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-teal-200/80 text-teal-900">
+                            {configuredTeacherIds.length} actif(s) / {dataset.teachers.length}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-teal-800 leading-tight">
+                          Supprime les créneaux creux (trous) et évite les déplacements pour seulement 1h en demi-journée.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {configuredTeacherIds.length < dataset.teachers.length ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const allIds = dataset.teachers.map((t) => t.id);
+                            setConfig({
+                              ...config,
+                              profsEviter1hDemiJournee: allIds,
+                              profsRegrouperHeuresAntiTrous: allIds,
+                            });
+                          }}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-teal-900 bg-white hover:bg-teal-100 border border-teal-300 rounded-lg shadow-2xs transition-colors"
+                        >
+                          <ShieldCheck className="w-3.5 h-3.5 text-teal-600" />
+                          <span>Activer pour tous</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setConfig({
+                              ...config,
+                              profsEviter1hDemiJournee: [],
+                              profsRegrouperHeuresAntiTrous: [],
+                            });
+                          }}
+                          className="px-2 py-1 text-[11px] font-medium text-slate-500 hover:text-slate-800 underline"
+                        >
+                          Désactiver tout
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {configuredTeacherIds.length > 0 && (
+                    <div className="pt-2 border-t border-teal-200/60 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <button
+                          type="button"
+                          onClick={() => setShowTeacherConstraintsList(!showTeacherConstraintsList)}
+                          className="inline-flex items-center gap-1.5 text-xs font-bold text-teal-900 hover:text-teal-950"
+                        >
+                          {showTeacherConstraintsList ? (
+                            <ChevronUp className="w-3.5 h-3.5 text-teal-700" />
+                          ) : (
+                            <ChevronDown className="w-3.5 h-3.5 text-teal-700" />
+                          )}
+                          <span>
+                            Enseignants sous contrainte ({configuredTeacherIds.length})
+                          </span>
+                          <span className="text-[11px] font-normal text-teal-700">
+                            — {showTeacherConstraintsList ? 'replier' : 'afficher les professeurs concernés'}
+                          </span>
+                        </button>
+                      </div>
+
+                      {showTeacherConstraintsList && (
+                        <div className="max-h-40 overflow-y-auto space-y-1 bg-white/80 p-2 rounded-lg border border-teal-200/60 divide-y divide-teal-100/60 text-xs">
+                          {configuredTeacherIds.map((tId) => {
+                            const teacher = teacherMap.get(tId);
+                            if (!teacher) return null;
+                            const isEviter = eviter1hIds.includes(tId);
+                            const isAnti = antiTrousIds.includes(tId);
+                            const meta = teacher.matiere ? getSubjectMeta(teacher.matiere) : null;
+                            const abbr = teacher.matiere ? getSubjectAbbreviation(teacher.matiere) : 'ENS';
+
+                            return (
+                              <div key={tId} className="flex items-center justify-between py-1 px-1.5">
+                                <div className="flex items-center gap-2">
+                                  <span
+                                    className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                      meta?.badgeClass || 'bg-slate-100 text-slate-800'
+                                    }`}
+                                  >
+                                    {abbr}
+                                  </span>
+                                  <span className="font-semibold text-slate-900">{teacher.nom}</span>
+                                  <span className="text-slate-500 text-[11px]">({teacher.matiere})</span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                  {isAnti && (
+                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200">
+                                      Anti-trous
+                                    </span>
+                                  )}
+                                  {isEviter && (
+                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
+                                      Min 2h
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

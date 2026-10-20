@@ -421,7 +421,7 @@ export function buildLpModel(
               const slack = `slack_1h_p${pIdx}_j${j}_${hd.id}`;
               allGenerals.push(slack);
               bounds.push(`0 <= ${slack} <= 1`);
-              const penalty1h = config.relaxedMode ? 1500 : 4000;
+              const penalty1h = config.relaxedMode ? 3500 : 16000;
               objTerms.push(`${penalty1h} ${slack}`);
               constraints.push(
                 `min2h_lower_p${pIdx}_j${j}_${hd.id}: ${allTerms.join(' + ')} - 2 ${yVar} + ${slack} >= 0`
@@ -431,35 +431,58 @@ export function buildLpModel(
         }
 
         // (5.B) Regrouper les heures au plus et éviter les trous le même jour
-        if (checkAntiTrous && daySlotIndices.length >= 3) {
+        if (checkAntiTrous && daySlotIndices.length >= 2) {
           const activeSlots = daySlotIndices.filter((s) => profXTermsForSlot(s).length > 0);
-          if (activeSlots.length >= 3) {
+          if (activeSlots.length >= 2) {
             for (let i = 0; i < activeSlots.length; i++) {
-              for (let m = i + 1; m < activeSlots.length; m++) {
-                for (let k = m + 1; k < activeSlots.length; k++) {
-                  const s1 = activeSlots[i];
-                  const mid = activeSlots[m];
-                  const s2 = activeSlots[k];
+              for (let k = i + 1; k < activeSlots.length; k++) {
+                const s1 = activeSlots[i];
+                const s2 = activeSlots[k];
+                const r1 = getSlotCoordinates(s1, semaine).rangHeure;
+                const r2 = getSlotCoordinates(s2, semaine).rangHeure;
+                if (r2 - r1 <= 1) continue; // Pas de trou si créneaux consécutifs
 
-                  const terms1 = profXTermsForSlot(s1);
+                const terms1 = profXTermsForSlot(s1);
+                const terms2 = profXTermsForSlot(s2);
+                if (terms1.length === 0 || terms2.length === 0) continue;
+
+                // Pour chaque créneau mid situé entre s1 et s2 sur la même journée
+                for (let mid = s1 + 1; mid < s2; mid++) {
+                  if (getSlotCoordinates(mid, semaine).jourIndex !== j) continue;
+
                   const termsMid = profXTermsForSlot(mid);
-                  const terms2 = profXTermsForSlot(s2);
-                  if (terms1.length === 0 || termsMid.length === 0 || terms2.length === 0) continue;
-
                   const trouVar = `trou_p${pIdx}_j${j}_s${s1}_${mid}_${s2}`;
                   allBinaries.push(trouVar);
-                  const penaltyTrou = config.relaxedMode ? 350 : 800;
+                  const penaltyTrou = config.relaxedMode ? 2500 : 12000;
                   objTerms.push(`${penaltyTrou} ${trouVar}`);
 
-                  // Syntaxe CPLEX propre : posTerms - negTerms - trouVar <= 1
                   const posPart = [...terms1, ...terms2].join(' + ');
-                  const negPart = termsMid.map((t) => `- ${t}`).join(' ');
-                  const left = `${posPart} ${negPart} - ${trouVar}`;
-                  constraints.push(`anti_trou_p${pIdx}_j${j}_${s1}_${mid}_${s2}: ${left} <= 1`);
+                  if (termsMid.length > 0) {
+                    const negPart = termsMid.map((t) => `- ${t}`).join(' ');
+                    constraints.push(`anti_trou_p${pIdx}_j${j}_${s1}_${mid}_${s2}: ${posPart} ${negPart} - ${trouVar} <= 1`);
+                  } else {
+                    // Si aucune unité n'est possible à mid, mid est FORCÉMENT un créneau creux si s1 et s2 sont affectés
+                    constraints.push(`anti_trou_p${pIdx}_j${j}_${s1}_${mid}_${s2}: ${posPart} - ${trouVar} <= 1`);
+                  }
                 }
               }
             }
           }
+        }
+
+        // (5.C) Rassembler les cours sur un minimum de jours (Minimiser les jours de déplacement)
+        const allDayTerms: string[] = [];
+        for (const s of daySlotIndices) {
+          allDayTerms.push(...profXTermsForSlot(s));
+        }
+        if (allDayTerms.length > 0) {
+          const dayActiveVar = `dayact_p${pIdx}_j${j}`;
+          allBinaries.push(dayActiveVar);
+          const dayCost = config.relaxedMode ? 250 : 500;
+          objTerms.push(`${dayCost} ${dayActiveVar}`);
+          constraints.push(
+            `prof_day_act_p${pIdx}_j${j}: ${allDayTerms.join(' + ')} - ${daySlotIndices.length} ${dayActiveVar} <= 0`
+          );
         }
       }
     }

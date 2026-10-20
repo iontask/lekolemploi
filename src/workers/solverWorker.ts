@@ -241,28 +241,41 @@ self.onmessage = async (e: MessageEvent<WorkerInMessage>) => {
           }
         }
 
+        // Optimisation et réparation locale sur la solution extraite de HiGHS
+        compactAndRepairTeacherSchedules(extractedPlanning, data, config, lockedAssignments);
+
         // Validation formelle avec verify()
         const violationsB = verify(extractedPlanning, data, config);
         const hardB = violationsB.filter((v) => v.severite === 'DURE');
+        const scoreB = score(extractedPlanning, data, config);
 
-        if (hardB.length === 0 && extractedPlanning.length >= phaseAPlanning.length) {
-          const scoreB = score(extractedPlanning, data, config);
+        const teacherViolationsB = violationsB.filter(
+          (v) => v.type === 'PROF_ISOLE_DEMI_JOURNEE' || v.type === 'PROF_TROU_JOURNEE'
+        ).length;
+        const teacherViolationsA = violationsA.filter(
+          (v) => v.type === 'PROF_ISOLE_DEMI_JOURNEE' || v.type === 'PROF_TROU_JOURNEE'
+        ).length;
 
+        const isBBetterOrEqual =
+          teacherViolationsB < teacherViolationsA ||
+          (teacherViolationsB === teacherViolationsA && scoreB.total <= scoreA.total + 50);
+
+        if (hardB.length === 0 && extractedPlanning.length >= phaseAPlanning.length && isBBetterOrEqual) {
           if (highsResult.Status === 'Optimal') {
             finalPlanning = extractedPlanning;
             quality = 'OPTIMAL';
             qualityLabel = 'Optimale prouvée (HiGHS)';
-            addWorkerLog('SUCCESS', `HiGHS : Solution optimale prouvée obtenue (Score : ${scoreB.total} pts).`, 'PHASE_B');
+            addWorkerLog('SUCCESS', `HiGHS : Solution optimale prouvée retenue (Score : ${scoreB.total} pts, ${teacherViolationsB} avertissements enseignants).`, 'PHASE_B');
           } else {
             finalPlanning = extractedPlanning;
             quality = 'FEASIBLE_NON_OPTIMAL';
             qualityLabel = 'Valide non prouvée optimale (Temps limite HiGHS atteint)';
-            addWorkerLog('SUCCESS', `HiGHS : Solution réalisable valide retenue (Score : ${scoreB.total} pts).`, 'PHASE_B');
+            addWorkerLog('SUCCESS', `HiGHS : Solution réalisable valide retenue (Score : ${scoreB.total} pts, ${teacherViolationsB} avertissements enseignants).`, 'PHASE_B');
           }
         } else {
           quality = 'HEURISTIC_ONLY';
-          qualityLabel = 'Heuristique Phase A conservée (solution HiGHS non conforme)';
-          addWorkerLog('WARNING', `HiGHS a retourné une solution avec violations dures ou moins d'heures. Solution Phase A conservée.`, 'PHASE_B');
+          qualityLabel = 'Heuristique Phase A conservée (meilleur respect des contraintes)';
+          addWorkerLog('INFO', `Solution Phase A conservée : meilleur respect des contraintes enseignants et de compacité (${teacherViolationsA} avertissements vs ${teacherViolationsB} pour HiGHS).`, 'PHASE_B');
         }
       } else {
         quality = 'HEURISTIC_ONLY';

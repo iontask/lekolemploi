@@ -520,7 +520,12 @@ export const ConstraintsPanel: React.FC<ConstraintsPanelProps> = ({
             unites={unitesList}
             classes={classes}
             options={options}
-            onChangeOptions={setOptions}
+            onChangeOptions={(newOpts) => {
+              setOptions(newOpts);
+              onSaveConstraints(newOpts, unitesList);
+              setSavedSuccess(true);
+              setTimeout(() => setSavedSuccess(false), 2500);
+            }}
             onSave={() => {
               onSaveConstraints(options, unitesList);
               setSavedSuccess(true);

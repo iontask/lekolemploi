@@ -985,8 +985,8 @@ export function score(
   const nombreViolationsDures = violations.filter((v) => v.severite === 'DURE').length;
   const profsIsoleesCount = violations.filter((v) => v.type === 'PROF_ISOLE_DEMI_JOURNEE').length;
   const profsTrousCount = violations.filter((v) => v.type === 'PROF_TROU_JOURNEE').length;
-  const penalitesProfIsoleDemiJournee = profsIsoleesCount * 75;
-  const penalitesProfTrous = profsTrousCount * 50;
+  const penalitesProfIsoleDemiJournee = profsIsoleesCount * 1200;
+  const penalitesProfTrous = profsTrousCount * 1000;
 
   const total =
     penalitesExcesJour +

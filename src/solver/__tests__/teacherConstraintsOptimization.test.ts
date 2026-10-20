@@ -85,7 +85,55 @@ describe('Optimisation des contraintes enseignants : Regroupement anti-trous & �
     const isolatedHalfDays = violations.filter((v) => v.type === 'PROF_ISOLE_DEMI_JOURNEE');
     expect(isolatedHalfDays).toHaveLength(0);
 
-    const trous = violations.filter((v) => v.type === 'PROF_TROUS_JOURNEE');
+    const trous = violations.filter((v) => v.type === 'PROF_TROU_JOURNEE');
+    expect(trous).toHaveLength(0);
+  });
+
+  it('rassemble les cours et élimine trous et 1h isolée pour un professeur multi-classes (cas Kaoutar Hama 11h)', () => {
+    const profPhilo: Teacher = {
+      id: 'p_philo',
+      nom: 'Kaoutar Hama',
+      matiere: 'Philo',
+      dispo: new Array(32).fill(true),
+    };
+
+    const c62BacSpf: Classe = { id: 'c_62bac_spf', nom: '6-2-BAC-SPF', niveau: '2BAC' };
+    const c62BacSe: Classe = { id: 'c_62bac_se', nom: '6-2-BAC-SE', niveau: '2BAC' };
+    const c4Tcsf1: Classe = { id: 'c_4tcsf_1', nom: '4-TCSF-1', niveau: 'TCSF' };
+    const c4Tcsf2: Classe = { id: 'c_4tcsf_2', nom: '4-TCSF-2', niveau: 'TCSF' };
+    const c51BacSef: Classe = { id: 'c_51bac_sef', nom: '5-1-BAC-SEF', niveau: '1BAC' };
+    const c51BacSeg: Classe = { id: 'c_51bac_seg', nom: '5-1-BAC-SEG', niveau: '1BAC' };
+
+    const unitesPhilo: Unite[] = [
+      { id: 'u_philo_spf', teacherId: profPhilo.id, classeIds: [c62BacSpf.id], heures: 4 },
+      { id: 'u_philo_se', teacherId: profPhilo.id, classeIds: [c62BacSe.id], heures: 3 },
+      { id: 'u_philo_tc1', teacherId: profPhilo.id, classeIds: [c4Tcsf1.id], heures: 1 },
+      { id: 'u_philo_tc2', teacherId: profPhilo.id, classeIds: [c4Tcsf2.id], heures: 1 },
+      { id: 'u_philo_1bac1', teacherId: profPhilo.id, classeIds: [c51BacSef.id], heures: 1 },
+      { id: 'u_philo_1bac2', teacherId: profPhilo.id, classeIds: [c51BacSeg.id], heures: 1 },
+    ];
+
+    const philoData: ScheduleData = {
+      teachers: [profPhilo],
+      classes: [c62BacSpf, c62BacSe, c4Tcsf1, c4Tcsf2, c51BacSef, c51BacSeg],
+      unites: unitesPhilo,
+      semaine: semaineStandard,
+    };
+
+    const config = {
+      ...DEFAULT_SOLVER_CONFIG,
+      profsEviter1hDemiJournee: [profPhilo.id],
+      profsRegrouperHeuresAntiTrous: [profPhilo.id],
+    };
+
+    const planning = solvePhaseA(philoData, config);
+    expect(planning.length).toBe(11);
+
+    const violations = verify(planning, philoData, config);
+    const isolatedHalfDays = violations.filter((v) => v.type === 'PROF_ISOLE_DEMI_JOURNEE');
+    const trous = violations.filter((v) => v.type === 'PROF_TROU_JOURNEE');
+
+    expect(isolatedHalfDays).toHaveLength(0);
     expect(trous).toHaveLength(0);
   });
 });
